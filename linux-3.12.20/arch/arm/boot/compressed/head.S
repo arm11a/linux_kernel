@@ -11,6 +11,10 @@
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 
+/*
+ * !! Let's Start. ARM11A
+ */
+
 	.arch	armv7-a
 /*
  * Debugging stuff
