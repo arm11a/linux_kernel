@@ -11,8 +11,8 @@
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 
-/*
- * !! Let's Start. ARM11A
+/*!!C
+ * Let's Start. ARM11A
  */
 
 	.arch	armv7-a
@@ -27,10 +27,15 @@
 
 #if defined(CONFIG_DEBUG_ICEDCC)
 
+/*!!Q
+ * loadsp, rb, tmp 에서 tmp 는 주소값을 나타낸다.
+ * define 에 따라 특정 주소값을 명시적으로 줄 수도 있고, * tmp 를 통해 인자로 줄 수도 있고,
+ * co-processor 를 사용할 경우에는 loadsp 가 아무일도 안할 수도 있다.
+ */
 #if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
 		.macro	loadsp, rb, tmp
 		.endm
-		.macro	writeb, ch, rb
+		.macro	writeb, ch, rb  /*!!C rb 는 실제로 사용되지는 않는다. length 를 의미하는게 아니다. */
 		mcr	p14, 0, \ch, c0, c5, 0
 		.endm
 #elif defined(CONFIG_CPU_XSCALE)
@@ -122,19 +127,34 @@
 /*
  * sort out different calling conventions
  */
-		.align
+		.align      /*!!C default = 4 byte */
 		.arm				@ Always enter in ARM state
 start:
 		.type	start,#function
+
+        /*!!C
+         * iamroot 에 댓글 찾아보면 이유를 알 수 있음.
+         * 매직넘버의 위치를 잘못알고 있는
+         * 특정 boot loader 를 위한 코드
+         */
 		.rept	7
 		mov	r0, r0
 		.endr
+
+   /*!!C
+    * thumb 은 2 개의 instruction 을 수행하지만
+    * ARM 은 2 개를 맞추기 위해서 무의미한 mov 를 하나 추가
+    * 이 또한 magic number 의 위치를 맞추기 위한 방법인 듯.
+    */
    ARM(		mov	r0, r0		)
    ARM(		b	1f		)
  THUMB(		adr	r12, BSYM(1f)	)
  THUMB(		bx	r12		)
 
 		.word	0x016f2818		@ Magic numbers to help the loader
+        /*!!Q
+         * start 와 _edata 는 언제 누가 설정해주는건가 ?
+         */
 		.word	start			@ absolute load/run zImage address
 		.word	_edata			@ zImage end address
  THUMB(		.thumb			)
@@ -143,6 +163,10 @@ start:
 #ifdef CONFIG_ARM_VIRT_EXT
 		bl	__hyp_stub_install	@ get into SVC mode, reversibly
 #endif
+        /*!!C
+         * r1, r2 는 boot loader 에서 넘어옴.
+         * r2 는 각종 메모리 정보 및 H/W 정보를 저장한 구조체.
+         */
 		mov	r7, r1			@ save architecture ID
 		mov	r8, r2			@ save atags pointer
 
@@ -152,13 +176,24 @@ start:
 		 * We only do this if we were in user mode on entry.
 		 */
 		mrs	r2, cpsr		@ get current mode
+        /*!!C
+         * supervisor mode(0x3)
+         * 현재는 SVC 모드이므로, 이의 결과로 zero flag 가
+         * 0 이 된다. (and 연산의 결과가 0 이 아니므로)
+         */
 		tst	r2, #3			@ not user?
+
+        /*!!C
+         * user mode 가 아니면 not_angel 로 분기.
+         * not equal 은 zero flag 가 설정(1)안되어 있다는 말임.
+         * 현재는 user mode 가 아니므로 not_angel 로 분기하게 됨.
+         */
 		bne	not_angel
 		mov	r0, #0x17		@ angel_SWIreason_EnterSVC
  ARM(		swi	0x123456	)	@ angel_SWI_ARM
  THUMB(		svc	0xab		)	@ angel_SWI_THUMB
 not_angel:
-		safe_svcmode_maskall r0
+		safe_svcmode_maskall r0 /*!!C 2014-06-07 */
 		msr	spsr_cxsf, r9		@ Save the CPU boot mode in
 						@ SPSR
 		/*
@@ -1199,33 +1234,54 @@ __armv3_mpu_cache_flush:
  */
 #ifdef DEBUG
 		.align	2
+
+        /*!!C
+         * Mark the symbol as being a data object
+         */
 		.type	phexbuf,#object
 phexbuf:	.space	12
+        /*!!Q
+         * 현재위치와 label 사이의 차이.
+         * .size 는 symbol table 에 추가적인 정보를 남기기 위해 사용됨.
+         *
+         * http://web.mit.edu/gnu/doc/html/as_7.html
+         * ==> COFF format 에서만 의미있고 ELF Format 에서는 무시됨.
+         *
+         * 왜 12 byte 를 0 으로 ?
+         * ==> type 이 object 니깐 code 영역이 아니라 data 영역을
+         *     잡는다 ?
+         */
 		.size	phexbuf, . - phexbuf
 
 @ phex corrupts {r0, r1, r2, r3}
+        /*!!C
+         * r0 = 4 byte, r1 = 8(4 byte = 4 bit x 8)
+         */
 phex:		adr	r3, phexbuf
 		mov	r2, #0
 		strb	r2, [r3, r1]
 1:		subs	r1, r1, #1
-		movmi	r0, r3
-		bmi	puts
-		and	r2, r0, #15
-		mov	r0, r0, lsr #4
+		movmi	r0, r3      /*!!C move if negative */
+		bmi	puts            /*!!C branch if negative */
+		and	r2, r0, #15     /*!!C 하위 4 bit -> r2 */
+		mov	r0, r0, lsr #4  /*!!C 4 bit 만큼 right shit */
 		cmp	r2, #10
-		addge	r2, r2, #7
-		add	r2, r2, #'0'
+		addge	r2, r2, #7  /*!!C '9' 와 'A' 의 차이 = 7 */
+		add	r2, r2, #'0'    /*!!C '0' = 0x30 */
 		strb	r2, [r3, r1]
 		b	1b
 
+/*!!C
+ * http://amitshah.bizhat.com/arm/arm_linux_boot-1.html 참고
+ */
 @ puts corrupts {r0, r1, r2, r3}
 puts:		loadsp	r3, r1
 1:		ldrb	r2, [r0], #1
 		teq	r2, #0
 		moveq	pc, lr
 2:		writeb	r2, r3
-		mov	r1, #0x00020000
-3:		subs	r1, r1, #1
+		mov	r1, #0x00020000 /*!!C 128 K */
+3:		subs	r1, r1, #1  /*!!Q 왜 looping 을 돌까? 단순 delay 인 듯... */
 		bne	3b
 		teq	r2, #'\n'
 		moveq	r2, #'\r'
@@ -1238,7 +1294,7 @@ putc:
 		mov	r2, r0
 		mov	r0, #0
 		loadsp	r3, r1
-		b	2b
+		b	2b              /*!!C puts 의 일부 루틴만 사용하기 위해 2 로 분기 */
 
 @ memdump corrupts {r0, r1, r2, r3, r10, r11, r12, lr}
 memdump:	mov	r12, r0
@@ -1246,13 +1302,13 @@ memdump:	mov	r12, r0
 		mov	r11, #0
 2:		mov	r0, r11, lsl #2
 		add	r0, r0, r12
-		mov	r1, #8
+		mov	r1, #8          /*!!C r0, r1(len=8) */
 		bl	phex
 		mov	r0, #':'
 		bl	putc
 1:		mov	r0, #' '
 		bl	putc
-		ldr	r0, [r12, r11, lsl #2]
+		ldr	r0, [r12, r11, lsl #2]  /*!!C 4 byte 단위 load */
 		mov	r1, #8
 		bl	phex
 		and	r0, r11, #7
@@ -1265,7 +1321,7 @@ memdump:	mov	r12, r0
 		bne	1b
 		mov	r0, #'\n'
 		bl	putc
-		cmp	r11, #64
+		cmp	r11, #64        /*!!C 4 x 64 = 256 */
 		blt	2b
 		mov	pc, r10
 #endif

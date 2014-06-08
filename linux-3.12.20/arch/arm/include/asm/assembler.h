@@ -262,16 +262,31 @@
  * This macro is intended for forcing the CPU into SVC mode at boot time.
  * you cannot return to the original mode.
  */
+/*!!C
+ * reg:req 에서 뒤의 req 는 request 임.
+ * reg 인자가 반드시 필요하다는 의미임.
+ */
 .macro safe_svcmode_maskall reg:req
 #if __LINUX_ARM_ARCH__ >= 6
 	mrs	\reg , cpsr
+    /*!!C
+     * reg 가 hyper mode 이면 exclusive or 연산에 의해
+     * 결과 reg 는 0 이 된다. - (1)
+     * 따라서, 원래의 reg 가 hyper mode 가 아닌 경우에만 
+     * reg 에는 0 이 아닌 값이 남는다. - (2)
+     */
 	eor	\reg, \reg, #HYP_MODE
+    /*!!C
+     * (1) 의 경우(hyper mode)에는 reg 와 MODE_MASK 의 and 연산 결과는 0 이 되어
+     * zero flag 가 셋팅된다.
+     * (2) 의 경우(not hyper mode)에는 zero flag 는 0 이 된다.
+     */
 	tst	\reg, #MODE_MASK
 	bic	\reg , \reg , #MODE_MASK
 	orr	\reg , \reg , #PSR_I_BIT | PSR_F_BIT | SVC_MODE
 THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
-	bne	1f
-	orr	\reg, \reg, #PSR_A_BIT
+	bne	1f                          /*!!C 위의 tst 결과에 따라 zero flag 가 0 이면 label 1 로 분기 */
+	orr	\reg, \reg, #PSR_A_BIT      /*!!C 이쪽은 Hyper mode 일 때만 수행 */
 	adr	lr, BSYM(2f)
 	msr	spsr_cxsf, \reg
 	__MSR_ELR_HYP(14)
