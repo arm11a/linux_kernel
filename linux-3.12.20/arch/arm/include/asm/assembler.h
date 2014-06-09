@@ -265,6 +265,17 @@
 /*!!C
  * reg:req 에서 뒤의 req 는 request 임.
  * reg 인자가 반드시 필요하다는 의미임.
+ *
+ * 안종현 Question:
+ *   head.S 에서 호출할 때 safe_svcmode_maskall r0 와 같이 호출하는데 r0 는 뭘까 ?
+ *
+ * 이동표 Answer:
+ *   매크로에서 reg 가 하나 꼭 필요한 이유는 이 레지스터를 cpsr 변경을 위한
+ *   임시 용도로 사용하기 위해서임.
+ *   아래 매크로 내에서 r4, r5 와 같이 범용레지스터를 fix 해서 사용하면
+ *   이 매크로는 범용성을 잃어버리기 때문에 여기저기에서 사용할 수 없게 됨.
+ *   그래서, 임시로 연산에 사용할 레지스터를 매크로 호출하는 측에서
+ *   지정해주기를 request 하는 것임.
  */
 .macro safe_svcmode_maskall reg:req
 #if __LINUX_ARM_ARCH__ >= 6
