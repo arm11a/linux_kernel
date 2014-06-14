@@ -212,6 +212,12 @@ not_angel:
 		@ determine final kernel image address
 		mov	r4, pc
 		and	r4, r4, #0xf8000000
+
+        /*!!C
+         * arch/arm/Makefile 에 정의되어 있음.
+         * 컴파일 옵션으로 -DTEXT_OFFSET 으로 주어짐.
+         * textofs-y   := 0x00008000
+         */
 		add	r4, r4, #TEXT_OFFSET
 #else
 		ldr	r4, =zreladdr
@@ -225,9 +231,20 @@ not_angel:
 		 */
 		mov	r0, pc
 		cmp	r0, r4
-		ldrcc	r0, LC0+32
+        /*!!C
+         * r0 < r4 이면 ldrcc 가 수행된다.
+         * (carry flag = 0)
+         * r0 가 r4 보다 크다는 얘기는 현재 수행 코드 위치가
+         * 압축해제된 image 가 놓일 위치를 넘어섰다는 의미임.
+         * 아래의 ldrcc 에서 blcs 까지는 넘어서지 않았을 때만 수행됨.
+         */
+		ldrcc	r0, LC0+32      /*!!C _end - restart + 16384 + 1024*1024 */
 		addcc	r0, r0, pc
 		cmpcc	r4, r0
+        /*!!C
+         * r4 < r0 이면 orrcc 가 수행된다.
+         * (carry flag = 0)
+         */
 		orrcc	r4, r4, #1		@ remember we skipped cache_on
 		blcs	cache_on
 
@@ -671,40 +688,128 @@ __armv3_mpu_cache_on:
 #define CB_BITS 0x0c
 #endif
 
+/*!!C
+ * r4 는 xxx + TEXT_OFFSET + 1 에 해당하는 값이 담겨있음.
+ * (압축풀린 image 가 놓일 곳)
+ */
 __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
-		bic	r3, r3, #0xff		@ Align the pointer
-		bic	r3, r3, #0x3f00
+        /*!!Q
+         * 왜 아래의 bit 들을 clear 할까 ?
+         * (0x3fff 는 16 KB 인데...)
+         * -> 일단 page directory 시작주소를 구해서 r3 로 넣은 것 같음. 
+         */
+		bic	r3, r3, #0xff		@ Align the pointer 1111 1111
+		bic	r3, r3, #0x3f00     @ 0011 1111 0000 0000
 /*
  * Initialise the page tables, turning on the cacheable and bufferable
  * bits for the RAM area only.
  */
 		mov	r0, r3
+        /**!C
+         * 18 bit = 256 MB
+         * 18 bit 를 clear 해버림.
+         */
 		mov	r9, r0, lsr #18
 		mov	r9, r9, lsl #18		@ start of RAM
-		add	r10, r9, #0x10000000	@ a reasonable RAM size
-		mov	r1, #0x12		@ XN|U + section mapping
-		orr	r1, r1, #3 << 10	@ AP=11
+		add	r10, r9, #0x10000000	@ a reasonable RAM size. 256 MB
+
+        /*!!Q
+         * 왜 아래 연산을 하는지 모르겠다.
+         */
+		mov	r1, #0x12		@ XN|U + section mapping  1 0010
+
+        /*!!C
+         * AP = Access Permission
+         * r1 = 1100 0001 0010
+         * r1 = 0xC12
+         *
+         * 11= read/write
+         */
+		orr	r1, r1, #3 << 10	@ AP=11      1100 0000 0000
+
+        /*!!C
+         * page directory start + 16 K
+         */
 		add	r2, r3, #16384
+
 1:		cmp	r1, r9			@ if virt > start of RAM
+
+        /*!!C
+         * r1 >= r9 이면 
+         * r10 = end of RAM
+         */
 		cmphs	r10, r1			@   && end of RAM > virt
-		bic	r1, r1, #0x1c		@ clear XN|U + C + B
-		orrlo	r1, r1, #0x10		@ Set XN|U for non-RAM
-		orrhs	r1, r1, r6		@ set RAM section settings
+
+        /*!!C
+         * U 와 AP(Access Permission) 만 남김
+         */
+		bic	r1, r1, #0x1c		@ clear XN|U + C + B   1 1100
+
+        /*!!C
+         * 아래의 orrlo 와 orrhs 는 위의 cmphs 결과로 수행 
+         */
+		orrlo	r1, r1, #0x10		@ Set XN|U for non-RAM  1 0000
+		orrhs	r1, r1, r6		@ set RAM section settings    1110
+
+        /*!!C
+         * *r0++ = r1
+         */
 		str	r1, [r0], #4		@ 1:1 mapping
-		add	r1, r1, #1048576
+
+        /*!!C
+         * page directory 의 하나의 entry 는
+         * 1 MB 를 가리킬 수 있으므로.
+         * 그래서, 4096 * 1 MB = 4 GB
+         */
+		add	r1, r1, #1048576    @ 1 MB
+
+        /*!!C
+         * 16 K 만큼 될 때까지 반복 
+         * (page table 초기화)
+         */
 		teq	r0, r2
 		bne	1b
+
+        /*!!C
+         * 여기까지가 page directory 초기화 완료 
+         */
 /*
  * If ever we are running from Flash, then we surely want the cache
  * to be enabled also for our execution instance...  We map 2MB of it
  * so there is no map overlap problem for up to 1 MB compressed kernel.
  * If the execution is in RAM then we would only be duplicating the above.
  */
+        /*!!C
+         * 1110 | 0100
+         * B = Bufferable
+         */
 		orr	r1, r6, #0x04		@ ensure B is set for this
+
+        /*!!C
+         * AP Setting
+         */
 		orr	r1, r1, #3 << 10
-		mov	r2, pc
+		mov	r2, pc      /*!!C  (1) */
+
+        /*!!C
+         * currently r1 = 1100 0000 1110 (0xC0E)
+         */
+
+        /*!!C
+         * 20 bit(1 MB) clear
+         */
 		mov	r2, r2, lsr #20
+
+        /*!!C
+         * r1 | (1) 에서 구한 pc의 상위 12 bit
+         */
 		orr	r1, r1, r2, lsl #20
+
+        /*!!C
+         * 여기에서 r1 의 상태는? r1 = 12 bit pc + 0000 0000 + r1(1100 0000 1110)
+         * 20140614
+         */
+
 		add	r0, r3, r2, lsl #2
 		str	r1, [r0], #4
 		add	r1, r1, #1048576
@@ -750,8 +855,21 @@ __armv4_mmu_cache_on:
 __armv7_mmu_cache_on:
 		mov	r12, lr
 #ifdef CONFIG_MMU
+        /*!!C
+         * http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0363g/Bgbfhfjc.html
+         *
+         * The ID_MMFR0 provides information about the memory model,
+         * memory management, and cache support operations of the processor
+         */
 		mrc	p15, 0, r11, c0, c1, 4	@ read ID_MMFR0
+        /*!!C
+         * (Virtual Memory System Architecture)
+         */
 		tst	r11, #0xf		@ VMSA
+
+        /*!!C
+         * r6 = 1110 (0xE)
+         */
 		movne	r6, #CB_BITS | 0x02	@ !XN
 		blne	__setup_mmu
 		mov	r0, #0
@@ -832,6 +950,10 @@ __common_mmu_cache_on:
  *  r12 = corrupted
  */
 
+PU Id
+ * adr 매크로는 proc_types(label)의 주소값을
+ * r12 에 넣어준다.
+ */
 call_cache_fn:	adr	r12, proc_types
 #ifdef CONFIG_CPU_CP15
 		mrc	p15, 0, r9, c0, c0	@ get processor ID
@@ -842,9 +964,18 @@ call_cache_fn:	adr	r12, proc_types
 		ldr	r2, [r12, #4]		@ get mask
 		eor	r1, r1, r9		@ (real ^ match)
 		tst	r1, r2			@       & mask
+
+        /*!!C
+         * processor ID 와 r12 에서 가져온 value 가 맞을 경우
+         * cache on 함수를 수행하기 위해 new CPU Id 쪽으로 이동 
+         */
  ARM(		addeq	pc, r12, r3		) @ call cache function
  THUMB(		addeq	r12, r3			)
  THUMB(		moveq	pc, r12			) @ call cache function
+        /*!!C
+         * processor ID 와 r12 에서 가져온 value 가 맞지 않을 경우 
+         * r12 + 20 씩 뛰면서 다음 value 를 가져오도록 한다.
+         */
 		add	r12, r12, #PROC_ENTRY_SIZE
 		b	1b
 
@@ -992,6 +1123,11 @@ proc_types:
 
 		.word	0x000f0000		@ new CPU Id
 		.word	0x000f0000
+        /*!!C
+         * W 의 의미 
+         * assembler 로 하여금 32 bit encoding 을 하도록 강제함.
+         * http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0204j/ch04s11s01.html
+         */
 		W(b)	__armv7_mmu_cache_on
 		W(b)	__armv7_mmu_cache_off
 		W(b)	__armv7_mmu_cache_flush
