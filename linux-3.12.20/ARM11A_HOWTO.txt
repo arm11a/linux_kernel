@@ -65,3 +65,7 @@
    모두 제거한 후 아래의 5 개 section 만 남는다.
 
     .text, .rodata, .piggydata, .got, .pad
+
+
+6. System.map 파일과 linux-3.12.20 디렉토리 에 있는 vmlix 파일의 objdump 를
+   비교하면 section 들의 주소값을 알 수 있다.

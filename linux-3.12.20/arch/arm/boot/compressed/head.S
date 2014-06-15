@@ -154,6 +154,7 @@ start:
 		.word	0x016f2818		@ Magic numbers to help the loader
         /*!!Q
          * start 와 _edata 는 언제 누가 설정해주는건가 ?
+         * -> linker script 에 지정할 수 있음 
          */
 		.word	start			@ absolute load/run zImage address
 		.word	_edata			@ zImage end address
@@ -206,11 +207,19 @@ not_angel:
 		 * by the linker here, but it should preserve r7, r8, and r9.
 		 */
 
+        /*!!C
+         * System.map 을 보면 _text 가 어디에서부터인지 확인할 수 있다.
+         * C0008000  T  _text
+         */
 		.text
 
 #ifdef CONFIG_AUTO_ZRELADDR
 		@ determine final kernel image address
 		mov	r4, pc
+
+        /*!!C
+         * 상위 5 bit 만 빼냄 
+         */
 		and	r4, r4, #0xf8000000
 
         /*!!C
@@ -220,6 +229,9 @@ not_angel:
          */
 		add	r4, r4, #TEXT_OFFSET
 #else
+        /*!!C
+         * mach-exynos/Makefile.boot 에 zreladdr-y += 0x40008000
+         */
 		ldr	r4, =zreladdr
 #endif
 
