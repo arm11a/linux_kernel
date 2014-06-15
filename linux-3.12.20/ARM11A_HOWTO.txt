@@ -1,4 +1,4 @@
-1. How to make zImage in Ubuntu ?
+1. 우분투에서 zImage 만드는 방법
 
     sudo apt-get install gcc-arm-linux-gnueabihf
     export ARCH=arm
@@ -16,15 +16,16 @@
     (2) arm-linux-gnueabihf-objdump -EL -b binary -D -m arm arch/arm/boot/zImage | head -n 20
 
 
-3. How to make config file ?
+3. How to make .config file ?
 
     export ARCH=arm
     export SUBARCH=arm
     export CROSS_COMPILE=arm-eabi-
     make exynos_defconfig
+    vi .config
     
 
-4. How can we read section headers in vmlinux file ?
+4. zImage 를 만들기 전의 ELF 파일인 vmlinux 파일에서 section header 레이아웃 확인
 
     arm-linux-gnueabihf-readelf -S vmlinux
 
@@ -60,6 +61,7 @@
 		  O (extra OS processing required) o (OS specific), p (processor specific)
 		 
 
-5. After vmlinux -> zImage ?
+5. vmlinux 에서 zImage 를 만들 때는 .comment, symbol, relocation 정보를 
+   모두 제거한 후 아래의 5 개 section 만 남는다.
 
     .text, .rodata, .piggydata, .got, .pad
