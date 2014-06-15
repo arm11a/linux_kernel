@@ -7,6 +7,7 @@
 
     Then, you can find zImage file in arch/arm/boot directory.
 
+
 2. How to find magic number in zImage ?
 
     There are two ways to extract hexa codes from a file.
@@ -14,3 +15,51 @@
     (1) hexdump arch/arm/boot/zImage | head -n3
     (2) arm-linux-gnueabihf-objdump -EL -b binary -D -m arm arch/arm/boot/zImage | head -n 20
 
+
+3. How to make config file ?
+
+    export ARCH=arm
+    export SUBARCH=arm
+    export CROSS_COMPILE=arm-eabi-
+    make exynos_defconfig
+    
+
+4. How can we read section headers in vmlinux file ?
+
+    arm-linux-gnueabihf-readelf -S vmlinux
+
+		There are 22 section headers, starting at offset 0x2b1c00:
+
+		Section Headers:
+		  [Nr] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al
+		  [ 0]                   NULL            00000000 000000 000000 00      0   0  0
+		  [ 1] .text             PROGBITS        00000000 008000 005b54 00  AX  0   0 32
+		  [ 2] .rodata           PROGBITS        00005b54 00db54 000d20 00   A  0   0  4
+		  [ 3] .piggydata        PROGBITS        00006874 00e874 28d5e5 00   A  0   0  1
+		  [ 4] .got.plt          PROGBITS        00293e5c 29be5c 00000c 04  WA  0   0  4
+		  [ 5] .got              PROGBITS        00293e68 29be68 000030 00  WA  0   0  4
+		  [ 6] .pad              PROGBITS        00293e98 29be98 000008 00  WA  0   0  1
+		  [ 7] .bss              NOBITS          00293ea0 29bea0 000024 00  WA  0   0  4
+		  [ 8] .stack            NOBITS          00293ec8 29bea0 001000 00  WA  0   0  1
+		  [ 9] .comment          PROGBITS        00000000 29bea0 00002a 01  MS  0   0  1
+		  [10] .ARM.attributes   ARM_ATTRIBUTES  00000000 29beca 00002f 00      0   0  1
+		  [11] .debug_line       PROGBITS        00000000 29bef9 0025ba 00      0   0  1
+		  [12] .debug_info       PROGBITS        00000000 29e4b3 0074c4 00      0   0  1
+		  [13] .debug_abbrev     PROGBITS        00000000 2a5977 00141d 00      0   0  1
+		  [14] .debug_aranges    PROGBITS        00000000 2a6d98 000188 00      0   0  8
+		  [15] .debug_ranges     PROGBITS        00000000 2a6f20 001310 00      0   0  8
+		  [16] .debug_frame      PROGBITS        00000000 2a8230 0009bc 00      0   0  4
+		  [17] .debug_loc        PROGBITS        00000000 2a8bec 007d42 00      0   0  1
+		  [18] .debug_str        PROGBITS        00000000 2b092e 001200 01  MS  0   0  1
+		  [19] .shstrtab         STRTAB          00000000 2b1b2e 0000d2 00      0   0  1
+		  [20] .symtab           SYMTAB          00000000 2b1f70 001400 10     21 213  4
+		  [21] .strtab           STRTAB          00000000 2b3370 000b5f 00      0   0  1
+		Key to Flags:
+		  W (write), A (alloc), X (execute), M (merge), S (strings)
+		  I (info), L (link order), G (group), T (TLS), E (exclude), x (unknown)
+		  O (extra OS processing required) o (OS specific), p (processor specific)
+		 
+
+5. After vmlinux -> zImage ?
+
+    .text, .rodata, .piggydata, .got, .pad
