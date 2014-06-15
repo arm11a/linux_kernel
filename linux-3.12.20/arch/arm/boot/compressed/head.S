@@ -706,7 +706,7 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
  */
 		mov	r0, r3
         /**!C
-         * 18 bit = 256 MB
+         * 18 bit = 256 KB
          * 18 bit 를 clear 해버림.
          */
 		mov	r9, r0, lsr #18
@@ -950,7 +950,7 @@ __common_mmu_cache_on:
  *  r12 = corrupted
  */
 
-PU Id
+/*!!C
  * adr 매크로는 proc_types(label)의 주소값을
  * r12 에 넣어준다.
  */

@@ -1,0 +1,16 @@
+1. How to make zImage in Ubuntu ?
+
+    sudo apt-get install gcc-arm-linux-gnueabihf
+    export ARCH=arm
+    export CROSS_COMPILE=arm-linux-gnueabihf-
+    make -j5
+
+    Then, you can find zImage file in arch/arm/boot directory.
+
+2. How to find magic number in zImage ?
+
+    There are two ways to extract hexa codes from a file.
+
+    (1) hexdump arch/arm/boot/zImage | head -n3
+    (2) arm-linux-gnueabihf-objdump -EL -b binary -D -m arm arch/arm/boot/zImage | head -n 20
+
