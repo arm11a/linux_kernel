@@ -58,7 +58,30 @@
 		  W (write), A (alloc), X (execute), M (merge), S (strings)
 		  I (info), L (link order), G (group), T (TLS), E (exclude), x (unknown)
 		  O (extra OS processing required) o (OS specific), p (processor specific)
-		 
+
+
+		dplee@dplee-VirtualBox:~/work/linux_kernel/linux-3.12.20$ arm-linux-gnueabihf-readelf -S vmlinux | head -n 20
+		There are 40 section headers, starting at offset 0x36b775c:
+
+		Section Headers:
+		  [Nr] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al
+		  [ 0]                   NULL            00000000 000000 000000 00      0   0  0
+		  [ 1] .head.text        PROGBITS        c0008000 008000 0001c0 00  AX  0   0  4
+		  [ 2] .text             PROGBITS        c00081c0 0081c0 36125c 00  AX  0   0 64
+		  [ 3] .rodata           PROGBITS        c036a000 36a000 0e7c68 00   A  0   0 64
+		  [ 4] __bug_table       PROGBITS        c0451c68 451c68 005d24 00   A  0   0  1
+		  [ 5] __ksymtab         PROGBITS        c045798c 45798c 0061c8 00   A  0   0  4
+		  [ 6] __ksymtab_gpl     PROGBITS        c045db54 45db54 003808 00   A  0   0  4
+		  [ 7] __ksymtab_strings PROGBITS        c046135c 46135c 0159b9 00   A  0   0  1
+		  [ 8] __param           PROGBITS        c0476d18 476d18 000790 00   A  0   0  4
+		  [ 9] __modver          PROGBITS        c04774a8 4774a8 000b58 00   A  0   0  4
+		  [10] __ex_table        PROGBITS        c0478000 478000 000ff8 00   A  0   0  8
+		  [11] .ARM.unwind_idx   ARM_EXIDX       c0478ff8 478ff8 01aaf8 00  AL 16   0  4
+		  [12] .ARM.unwind_tab   PROGBITS        c0493af0 493af0 003ff0 00   A  0   0  4
+		  [13] .notes            NOTE            c0497ae0 497ae0 000024 00  AX  0   0  4
+		  [14] .vectors          PROGBITS        00000000 498000 000020 00  AX  0   0  4
+		  [15] .stubs            PROGBITS        00001000 499000 000240 00  AX  0   0 32
+
 
 4. vmlinux 에서 zImage 를 만들 때는 .comment, symbol, relocation 정보를 
    모두 제거한 후 아래의 5 개 section 만 남는다.
