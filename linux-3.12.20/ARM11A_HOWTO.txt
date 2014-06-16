@@ -3,6 +3,14 @@
     sudo apt-get install gcc-arm-linux-gnueabihf
     export ARCH=arm
     export CROSS_COMPILE=arm-linux-gnueabihf-
+    make ARCH=arm exynos_defconfig
+       - You can see .config file.
+    make ARCH=arm menuconfig
+       - System Type -> Enter
+       - SAMSUNG EXYNOS SoCs Support -> Enter
+       - [*]SAMSUNG EXYNOS5 -> Select using spacebar
+       - [ ]SAMSUNG EXYNOS4 -> Deselect
+       - Save & Exit
     make -j5
 
     Then, you can find zImage file in arch/arm/boot directory.
@@ -16,16 +24,7 @@
     (2) arm-linux-gnueabihf-objdump -EL -b binary -D -m arm arch/arm/boot/zImage | head -n 20
 
 
-3. How to make .config file ?
-
-    export ARCH=arm
-    export SUBARCH=arm
-    export CROSS_COMPILE=arm-eabi-
-    make exynos_defconfig
-    vi .config
-    
-
-4. zImage 를 만들기 전의 ELF 파일인 vmlinux 파일에서 section header 레이아웃 확인
+3. zImage 를 만들기 전의 ELF 파일인 vmlinux 파일에서 section header 레이아웃 확인
 
     arm-linux-gnueabihf-readelf -S vmlinux
 
@@ -61,11 +60,11 @@
 		  O (extra OS processing required) o (OS specific), p (processor specific)
 		 
 
-5. vmlinux 에서 zImage 를 만들 때는 .comment, symbol, relocation 정보를 
+4. vmlinux 에서 zImage 를 만들 때는 .comment, symbol, relocation 정보를 
    모두 제거한 후 아래의 5 개 section 만 남는다.
 
     .text, .rodata, .piggydata, .got, .pad
 
 
-6. System.map 파일과 linux-3.12.20 디렉토리 에 있는 vmlix 파일의 objdump 를
+5. System.map 파일과 linux-3.12.20 디렉토리 에 있는 vmlix 파일의 objdump 를
    비교하면 section 들의 주소값을 알 수 있다.
