@@ -91,3 +91,25 @@
 
 5. System.map 파일과 linux-3.12.20 디렉토리 에 있는 vmlix 파일의 objdump 를
    비교하면 section 들의 주소값을 알 수 있다.
+
+
+6. Kernel Image (make 시 V=1 로 하면 빌드 과정을 Detail 하게 볼 수 있음)
+
+          objcopy          gzip               as            ld            objcopy
+   vmlinux ------>  Image -------> piggy.gz -----> piggy.o ----> vmlinux --------> zImage
+    (1)              (2)             (3)            (4)            (5)              (6)
+
+    (1) vmlinux  : Raw kernel excutable (ELF Object)           : linux_kernel/linux-3.12.20
+    (2) Image    : Stripped kernel binary (binary object)      : linux_kernel/linux-3.12.20/arch/arm/boot
+    (3) piggy.gz : Compressed kernel binary
+    (4) asm wrapper around piggy.gz + bootstrap code
+    (5) vmlinux  : Composite kernel image (ELF Object)         : linux_kernel/linux-3.12.20/arch/arm/boot/compressed
+    (6) zImage   : Kernel image for bootloader (binary object) : linux_kernel/linux-3.12.20/arch/arm/boot
+
+    +---------------------+----------------------------------+-----------+
+    | compressed kernel   |  압축해제코드 (head.o, misc.o)   |  text     | 
+    |     (zImage)        +----------------------------------+-----------+
+    |                     |  압축된 커널이미지 (piggy.gz)    | piggydata |
+    |                     +----------------------------------+-----------+
+    |                     |  초기 데이터 (head.o, misc.o)    | got, data |
+    +---------------------+----------------------------------+-----------+
