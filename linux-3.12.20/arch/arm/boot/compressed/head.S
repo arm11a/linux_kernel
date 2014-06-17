@@ -147,6 +147,10 @@ start:
     * 이 또한 magic number 의 위치를 맞추기 위한 방법인 듯.
     */
    ARM(		mov	r0, r0		)
+
+   /*!!C
+    * 20:  ea000002    b    0x30
+    */
    ARM(		b	1f		)
  THUMB(		adr	r12, BSYM(1f)	)
  THUMB(		bx	r12		)
@@ -160,8 +164,15 @@ start:
 		.word	_edata			@ zImage end address
  THUMB(		.thumb			)
 1:
+       /*!!C
+        * 30:  e10f9000    mrs r9, cpsr
+        */
 		mrs	r9, cpsr
 #ifdef CONFIG_ARM_VIRT_EXT
+
+       /*!!C
+        * 34:  eb0000e1    bl 0x38c0
+        */
 		bl	__hyp_stub_install	@ get into SVC mode, reversibly
 #endif
         /*!!C
@@ -189,12 +200,24 @@ start:
          * not equal 은 zero flag 가 설정(1)안되어 있다는 말임.
          * 현재는 user mode 가 아니므로 not_angel 로 분기하게 됨.
          */
+
+        /*!!C
+         * 48:  1a000001   bne  0x54
+         */
 		bne	not_angel
 		mov	r0, #0x17		@ angel_SWIreason_EnterSVC
  ARM(		swi	0x123456	)	@ angel_SWI_ARM
  THUMB(		svc	0xab		)	@ angel_SWI_THUMB
 not_angel:
+
+        /*!!C
+         * 54:  e10f0000    mrs  r0, cpsr
+         */
 		safe_svcmode_maskall r0 /*!!C 2014-06-07 */
+
+        /*!!C
+         * 84:  e16ff009    msr  spsr_cxsf, r9
+         */
 		msr	spsr_cxsf, r9		@ Save the CPU boot mode in
 						@ SPSR
 		/*
@@ -215,6 +238,10 @@ not_angel:
 
 #ifdef CONFIG_AUTO_ZRELADDR
 		@ determine final kernel image address
+
+        /*!!C
+         * a0:  e1a0400f    mov r4, pc
+         */
 		mov	r4, pc
 
         /*!!C
@@ -225,7 +252,7 @@ not_angel:
         /*!!C
          * arch/arm/Makefile 에 정의되어 있음.
          * 컴파일 옵션으로 -DTEXT_OFFSET 으로 주어짐.
-         * textofs-y   := 0x00008000
+         * textofs-y   := 0x00008000  ; 32 KB
          */
 		add	r4, r4, #TEXT_OFFSET
 #else
@@ -241,6 +268,10 @@ not_angel:
 		 * Given that r4 > &_end is most unfrequent, we add a rough
 		 * additional 1MB of room for a possible appended DTB.
 		 */
+
+        /*!!C
+         * ac:  e1a0000f   mov  r0, pc
+         */
 		mov	r0, pc
 		cmp	r0, r4
         /*!!C
@@ -258,6 +289,10 @@ not_angel:
          * (carry flag = 0)
          */
 		orrcc	r4, r4, #1		@ remember we skipped cache_on
+
+        /*!!C
+         * c4:  2b00008d   blcs  0x300
+         */
 		blcs	cache_on
 
 restart:	adr	r0, LC0
@@ -629,7 +664,15 @@ params:		ldr	r0, =0x10000100		@ params_phys for RPC
  *  r4, r7, r8
  */
 		.align	5
+
+        /*!!C
+         * 300:  e3a03008  mov r3, #8
+         */
 cache_on:	mov	r3, #8			@ cache_on function
+
+        /*!!C
+         * 304: ea00088   b  0x52c
+         */
 		b	call_cache_fn
 
 /*
@@ -864,6 +907,10 @@ __armv4_mmu_cache_on:
 #endif
 		mov	pc, r12
 
+
+/*!!C
+ * 458:  e1a0c00e   mov  r12, lr
+ */
 __armv7_mmu_cache_on:
 		mov	r12, lr
 #ifdef CONFIG_MMU
@@ -966,12 +1013,19 @@ __common_mmu_cache_on:
  * adr 매크로는 proc_types(label)의 주소값을
  * r12 에 넣어준다.
  */
+
+/*!!C
+ * 52c:  e28fc01c   ip, pc, #28
+ */
 call_cache_fn:	adr	r12, proc_types
 #ifdef CONFIG_CPU_CP15
 		mrc	p15, 0, r9, c0, c0	@ get processor ID
 #else
 		ldr	r9, =CONFIG_PROCESSOR_ID
 #endif
+        /*!!C
+         * 534:  e59c1000   ldr r1, [ip]
+         */
 1:		ldr	r1, [r12, #0]		@ get value
 		ldr	r2, [r12, #4]		@ get mask
 		eor	r1, r1, r9		@ (real ^ match)
@@ -988,7 +1042,14 @@ call_cache_fn:	adr	r12, proc_types
          * processor ID 와 r12 에서 가져온 value 가 맞지 않을 경우 
          * r12 + 20 씩 뛰면서 다음 value 를 가져오도록 한다.
          */
+        /*!!C
+         * 548:  e28cc014   add ip, ip, #20
+         */
 		add	r12, r12, #PROC_ENTRY_SIZE
+
+        /*!!C
+         * 54c:  eafffff8   b  0x534
+         */
 		b	1b
 
 /*
@@ -1008,6 +1069,10 @@ call_cache_fn:	adr	r12, proc_types
 		.align	2
 		.type	proc_types,#object
 proc_types:
+
+        /*!!C
+         * 550:  41000000
+         */
 		.word	0x41000000		@ old ARM ID
 		.word	0xff00f000
 		mov	pc, lr
@@ -1133,12 +1198,21 @@ proc_types:
 		W(b)	__armv4_mmu_cache_off
 		W(b)	__armv6_mmu_cache_flush
 
+        /*!!C
+         * 6a4:  000f0000
+         */
 		.word	0x000f0000		@ new CPU Id
 		.word	0x000f0000
         /*!!C
          * W 의 의미 
          * assembler 로 하여금 32 bit encoding 을 하도록 강제함.
          * http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0204j/ch04s11s01.html
+         */
+
+        /*!!C
+         * 6ac:  eaffff69   b  0x458
+         * 6b0:  ea000021   b  0x73c
+         * 6b4:  ea00004c   b  0x7ec
          */
 		W(b)	__armv7_mmu_cache_on
 		W(b)	__armv7_mmu_cache_off
