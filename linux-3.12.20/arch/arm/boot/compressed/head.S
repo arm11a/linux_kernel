@@ -246,6 +246,7 @@ not_angel:
 
         /*!!C
          * 상위 5 bit 만 빼냄 
+         * (zImage 를 어디에 올렸더라도 128 MB 경계를 기준으로 생각함 !!!)
          */
 		and	r4, r4, #0xf8000000
 
@@ -267,6 +268,95 @@ not_angel:
 		 * That means r4 < pc && r4 - 16k page directory > &_end.
 		 * Given that r4 > &_end is most unfrequent, we add a rough
 		 * additional 1MB of room for a possible appended DTB.
+         *
+         * page table 이 이 코드를 overwrite 하지 않는 경우에만 page table 을 셋팅한다.
+         * 즉, cache_on 과정으로 들어간다.
+         *
+         *  case(1) r0 >= r4 인 경우 
+         *          이는 zImage 가 최소한 0x8000 offset 보다는 위쪽에 로딩된 경우임.
+         *          위와 같은 경우는 cache_on 에 의해 overwrite 될 일이 없으므로
+         *          바로 cache_on 으로 가면 된다.
+         *          cache_on 내에서 page directory 를 위해 (1) 구간을 사용한다. 
+         *
+         *          +--------------+-> 128m end
+         *          |              |
+         *          |              |
+         *          +--------------+ _end
+         *          |              |
+         *          |    zImage    |-> r0 = pc
+         *          |              |
+         *          +--------------+
+         *          |              |
+         *          |              |-> r4 = +0x8000 (32k) (uncompressed image start)
+         *          |     (1)      |
+         *          +--------------+-> 128m start
+         *
+         *
+         *  case(2) r0 < r4 인 경우 첫번째 
+         *          r0 값을 pc + zImage size + 16k + 1m 로 조정하여 r4 와 비교했을 때
+         *          그래도 r4 가 크다면 case(1) 과 마찬가지로 그냥 cache on 으로 가면 된다.
+         *          하지만, 이는 발생할 수 없는 case 이다.
+         *          (pc + zImage size + 16k + 1m) 의 값이 (pc & 0xf8 + 0x8000)보다 작을 수는
+         *          없기 때문이다.  zImage size 만해도 2m 가 넘기 때문에...
+         *          dtb 1m 가 없고 zImage size 가 아주 작다면 가능한 얘기이긴 하지만 unfrequent 하다.
+         *
+         *          +--------------+-> 128m end
+         *          |              |
+         *          |              |
+         *          |              |-> r4 = +0x8000 (32k) (uncompressed image start)
+         *          |              |
+         *          |              |-> r0 = pc + zImage size + 16k + 1m
+         *          |              |
+         *          +--------------+ _end
+         *          |              |
+         *          |    zImage    |
+         *          |              |-> r0 = pc
+         *          +--------------+
+         *          |              |
+         *          |              |
+         *          +--------------+-> 128m start
+         *
+         *
+         *  case(3) r0 < r4 인 경우 두번째 
+         *          zImage 를 r4 지점보다 낮을 곳에 올리게 되면 아래와 같이 uncompressed
+         *          image start 지점이 zImage 를 overwrite 할 수 있다.
+         *          이 때는 cache on 으로 가지 않고 restart label 로 간다. 
+         *
+         *          +--------------+-> 128m end
+         *          |              |
+         *          |              |
+         *          |              +-> r0 = pc + zImage size + 16k + 1m
+         *          |              |
+         *          +--------------+ _end
+         *          |              |
+         *          |              |-> r4 = +0x8000 (32k) (uncompressed image start)
+         *          |    zImage    |
+         *          |              |-> r0 = pc
+         *          +--------------+
+         *          |              |
+         *          |              |
+         *          +--------------+-> 128m start
+         *
+         *
+         * 결국 위의 3 개 상황 중에서 best 는 case(1)의 경우이다.
+         * zImage 를 memory 에 올릴 때 로딩 위치를 잘 잡아주면 쓸데없이 재배치하고 이런
+         * 수고들이 덜어져서 booting 속도도 빠를 것이다.
+         * 위와 같은 상황들 때문에 Document/arm/Booting 문서를 보면 다음과 같은 문구들이 있다.
+         *
+         * 4b. Setup the device tree
+         *     A safe location is just above the 128MiB boundary from start of RAM.
+         *     dtb 는 128m 경계 바로 위에 위치시켜야 안전하다.
+         *
+         * 6. Calling the kernel image
+         * ---------------------------
+         * ...
+         * The zImage may also be placed in system RAM and called there.  The
+         * kernel should be placed in the first 128MiB of RAM.  It is recommended
+         * that it is loaded above 32MiB in order to avoid the need to relocate
+         * prior to decompression, which will make the boot process slightly
+         * faster.
+         * 되도록이면 zImage 는 RAM 의 첫번째 128m 에 위치시키되, 32m 넘는 곳에 위치시켜라.
+         * 그러면 쓸데없는 재배치과정이 없어져서 booting 속도가 약간 빨라진다.
 		 */
 
         /*!!C
@@ -278,10 +368,11 @@ not_angel:
          * r0 < r4 이면 ldrcc 가 수행된다.
          * (carry flag = 0)
          * r0 가 r4 보다 크다는 얘기는 현재 수행 코드 위치가
-         * 압축해제된 image 가 놓일 위치를 넘어섰다는 의미임.
+         * 압축해제된 image 가 놓일 위치를 넘어설 수 있다는 의미임.
          * 아래의 ldrcc 에서 blcs 까지는 넘어서지 않았을 때만 수행됨.
          */
 		ldrcc	r0, LC0+32      /*!!C _end - restart + 16384 + 1024*1024 */
+		                        /*!!C  = zImage size + page directory size + dtb  */
 		addcc	r0, r0, pc
 		cmpcc	r4, r0
         /*!!C
@@ -294,6 +385,12 @@ not_angel:
          * c4:  2b00008d   blcs  0x300
          */
 		blcs	cache_on
+
+        /*!!C
+         * cache_on 수행안했을 경우  (r4 > r0)
+         * r0 : 
+         *
+         */
 
 restart:	adr	r0, LC0
 		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
