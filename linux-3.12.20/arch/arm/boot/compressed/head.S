@@ -357,7 +357,7 @@ not_angel:
          * faster.
          * 되도록이면 zImage 는 RAM 의 첫번째 128m 에 위치시키되, 32m 넘는 곳에 위치시켜라.
          * 그러면 쓸데없는 재배치과정이 없어져서 booting 속도가 약간 빨라진다.
-		 */
+         */
 
         /*!!C
          * ac:  e1a0000f   mov  r0, pc
@@ -385,12 +385,6 @@ not_angel:
          * c4:  2b00008d   blcs  0x300
          */
 		blcs	cache_on
-
-        /*!!C
-         * cache_on 수행안했을 경우  (r4 > r0)
-         * r0 : 
-         *
-         */
 
 restart:	adr	r0, LC0
 		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
@@ -841,17 +835,32 @@ __armv3_mpu_cache_on:
 #endif
 
 /*!!C
+ *
+ *  Level 1 Page Table
+ *    -----------
+ *
+ *    -----------
+ *
+ *    -----------
+ *
+ *    -----------
+ *
+ *    -----------
+ *
+ *    -----------
+ */
+/*!!C
  * r4 는 xxx + TEXT_OFFSET + 1 에 해당하는 값이 담겨있음.
  * (압축풀린 image 가 놓일 곳)
  */
 __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
         /*!!Q
          * 왜 아래의 bit 들을 clear 할까 ?
-         * (0x3fff 는 16 KB 인데...)
-         * -> 일단 page directory 시작주소를 구해서 r3 로 넣은 것 같음. 
+         * -> page directory 시작주소를 16k 로 align 하여 r3 에 넣음.
+         *    (0x8xxx) 에서 xxx 에 해당하는 것은 짤라버림.
          */
-		bic	r3, r3, #0xff		@ Align the pointer 1111 1111
-		bic	r3, r3, #0x3f00     @ 0011 1111 0000 0000
+		bic	r3, r3, #0xff		@ Align the pointer
+		bic	r3, r3, #0x3f00
 /*
  * Initialise the page tables, turning on the cacheable and bufferable
  * bits for the RAM area only.
@@ -860,47 +869,89 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
         /**!C
          * 18 bit = 256 KB
          * 18 bit 를 clear 해버림.
+         * page directory 의 시작주소에서 하위 18 bit 를 짤라낸다는건
+         * 128m 의 경계 첫 주소를 나타냄.
+         * 주로 RAM 의 첫번째 128m 구역 안에 zImage 를 올리므로
+         * 이는 start of RAM 이 된다.
+         *
+         * r9  = start of RAM
+         * r10 = start of RAM + 256m
          */
 		mov	r9, r0, lsr #18
 		mov	r9, r9, lsl #18		@ start of RAM
 		add	r10, r9, #0x10000000	@ a reasonable RAM size. 256 MB
 
-        /*!!Q
-         * 왜 아래 연산을 하는지 모르겠다.
+        /*!!C
+         * XN (Excute Never)
+         *    When the XN bit is 1, a Permission fault is generated
+         *    if the processor attempts to execute an instruction fetched
+         *    from the corresponding memory region.
+         *
+         * U (allow write to Update the cache)
          */
 		mov	r1, #0x12		@ XN|U + section mapping  1 0010
 
         /*!!C
          * AP = Access Permission
-         * r1 = 1100 0001 0010
-         * r1 = 0xC12
-         *
          * 11= read/write
+         *
+         * r1 = 1100 0001 0010 (0xC12)
+         *      ^^      ^   ^
+         *      ||      |   |
+         *      AP     XN | U
          */
-		orr	r1, r1, #3 << 10	@ AP=11      1100 0000 0000
+		orr	r1, r1, #3 << 10	@ AP=11      1100 0000 0000(0xC00)
 
         /*!!C
          * page directory start + 16 K
          */
 		add	r2, r3, #16384
 
-1:		cmp	r1, r9			@ if virt > start of RAM
-
         /*!!C
-         * r1 >= r9 이면 
-         * r10 = end of RAM
+         * 현재 시점에서 register 값 
+         *
+         *  r1 = 0xC12
+         *  r4 = xxx + TEXT_OFFSET + 1  : start of uncompressed image + 1
+         *  r3 = (r4 - 16k) & ~(0x3fff) : start of page directory 
+         *  r2 = r3 + 16k
+         *  r0 = r3 & ~(low 18bit)      : temporary
+         *  r7, r8 = architecture id, atags
+         *  r9 = start of RAM (128m 경계의 시작)
+         *  r10 = start of RAM + 256m
+         *
+         *  +--------------+-> r10 = +0x10000000 (256m)
+         *  |              |
+         *  |              |
+         *  |              |
+         *  |              |-> r4 = +0x8001 (32k + 1)
+         *  |              |-> r2 = +0x8000 (32k)
+         *  |              |
+         *  |              |-> r3 = +0x4000 (16k)
+         *  |              |
+         *  |              |-> r1 = +0xC12
+         *  +--------------+-> r9 = +0
+         *
          */
+1:		cmp	r1, r9			@ if virt > start of RAM
 		cmphs	r10, r1			@   && end of RAM > virt
 
         /*!!C
-         * U 와 AP(Access Permission) 만 남김
+         * U 와 AP(Access Permission) 만 남김 (bit clear)
+         * before r1 = 1100 0001 0010 (0xC02)
+         * after  r1 = 1100 0000 0010 (0xC02)
          */
-		bic	r1, r1, #0x1c		@ clear XN|U + C + B   1 1100
+		bic	r1, r1, #0x1c		@ clear XN|U + C + B   0x1c(11100)
 
         /*!!C
          * 아래의 orrlo 와 orrhs 는 위의 cmphs 결과로 수행 
+         * r6에는 __setup_mmul 호출 전에 #CB_BITS | 0x02 가 들어있었다.
          */
 		orrlo	r1, r1, #0x10		@ Set XN|U for non-RAM  1 0000
+
+        /*!!C
+         * #define CB_BITS 에 의해 0x08 아니면 0x0C
+         * 0x08 이면 섹션테이블의 C=1, B=0 으로 세팅, 0x0C 이면 C=1, B=1 로 세팅.
+         */
 		orrhs	r1, r1, r6		@ set RAM section settings    1110
 
         /*!!C
@@ -1016,18 +1067,28 @@ __armv7_mmu_cache_on:
          *
          * The ID_MMFR0 provides information about the memory model,
          * memory management, and cache support operations of the processor
+         *
+         * MMFR(Memory Model Feature Register)
+         * A15 TRM(Technical Reference Manual) 참조 
          */
 		mrc	p15, 0, r11, c0, c1, 4	@ read ID_MMFR0
+
         /*!!C
-         * (Virtual Memory System Architecture)
+         * VMSA(Virtual Memory System Architecture)
+         * config_MMU 가 설정되어 있다면 VMSA 일 것 같은데 ?
+         * -> config_MMU 가 설정되어 있던 아니던 cp15 로
+         *    좀더 정확한 체크를 위해 하는 것 같다.
          */
 		tst	r11, #0xf		@ VMSA
 
         /*!!C
          * r6 = 1110 (0xE)
+         * VMSA 일 경우에만 아래 두줄 수행 
+         * CB_BITS (Bufferable Flag) - Cache 정책이 Write Back 일 경우 
          */
 		movne	r6, #CB_BITS | 0x02	@ !XN
-		blne	__setup_mmu
+		blne	__setup_mmu  /*!!C 커널 압축하고 해제하고 실행하는데 필요한 page directory 설정 */
+
 		mov	r0, #0
 		mcr	p15, 0, r0, c7, c10, 4	@ drain write buffer
 		tst	r11, #0xf		@ VMSA
@@ -1300,12 +1361,12 @@ proc_types:
          */
 		.word	0x000f0000		@ new CPU Id
 		.word	0x000f0000
+
         /*!!C
          * W 의 의미 
          * assembler 로 하여금 32 bit encoding 을 하도록 강제함.
          * http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0204j/ch04s11s01.html
          */
-
         /*!!C
          * 6ac:  eaffff69   b  0x458
          * 6b0:  ea000021   b  0x73c
