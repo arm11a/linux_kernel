@@ -836,18 +836,29 @@ __armv3_mpu_cache_on:
 
 /*!!C
  *
- *  Level 1 Page Table
- *    -----------
+ * www.iamroot.org/xe/Kernel_10_ARM/176798
+ * recipes.egloos.com/5232056
+ * 위의 url 에서 MMU 의 page table 공부부터 필요
  *
- *    -----------
+ *   Page Table
  *
- *    -----------
+ *                 Level 1                      Level 2 
+ *   TTBR -> +------------------+
+ *           | Section Entry  10|-------------------------> Section Page(1m)
+ *           +------------------+
+ *           | Coarse Page    01|---> Coarse Page Table --> Large(64k), Small(4k) Page
+ *           +------------------+
+ *           | Fine Page      11|---> Fine Page Table  ---> Large(64k), Small(4k), Tiny(1k) Page
+ *           +------------------+
+ *           | Fault          00|---> Invalid
+ *           +------------------+
+ *           |      ...         |
+ *           +------------------+
+ *                4096 entry
+ *          (4 byte * 4096 = 16k)
  *
- *    -----------
- *
- *    -----------
- *
- *    -----------
+ *   Level 1 Page Table Entry 의 마지막 2 비트를 보고 해당 Entry 가 
+ *   section 또는 large, small page 중 어떤 것을 가리킬지 결정한다.
  */
 /*!!C
  * r4 는 xxx + TEXT_OFFSET + 1 에 해당하는 값이 담겨있음.
@@ -944,13 +955,18 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
 
         /*!!C
          * 아래의 orrlo 와 orrhs 는 위의 cmphs 결과로 수행 
-         * r6에는 __setup_mmul 호출 전에 #CB_BITS | 0x02 가 들어있었다.
+         * r6에는 __setup_mmu 호출 전에 #CB_BITS | 0x02 가 들어있었다.
          */
 		orrlo	r1, r1, #0x10		@ Set XN|U for non-RAM  1 0000
 
         /*!!C
          * #define CB_BITS 에 의해 0x08 아니면 0x0C
          * 0x08 이면 섹션테이블의 C=1, B=0 으로 세팅, 0x0C 이면 C=1, B=1 로 세팅.
+         *
+         *   C B
+         *   0 0  : Cache Off, Write Buffer Off
+         *   1 0  : Cache On(Write Through), Write Buffer On
+         *   1 1  : Cache On(Write Back), Write Buffer On
          */
 		orrhs	r1, r1, r6		@ set RAM section settings    1110
 
