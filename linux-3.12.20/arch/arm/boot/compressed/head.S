@@ -1351,7 +1351,7 @@ call_cache_fn:	adr	r12, proc_types
 
         /*!!C-----------------------------------------------------------------
          * processor ID 와 r12 에서 가져온 value 가 맞을 경우
-         * cache on 함수를 수행하기 위해 new CPU Id 쪽으로 이동 
+         * __armv7_mmu_cache_on 함수를 수행하기 위해 new CPU Id 쪽으로 이동 
          -------------------------------------------------------------------*/
  ARM(		addeq	pc, r12, r3		) @ call cache function
  THUMB(		addeq	r12, r3			)
