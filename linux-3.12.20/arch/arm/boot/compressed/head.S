@@ -991,20 +991,21 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
          *      |              |
          *      |              |
          *      |  CB not set  | -> 여기는 r1(virt)가 end of RAM 보다 크므로
-         *      |              |    Cache, Buffer 가 Off 상태로 셋팅된 r1 이 들어간다.
-         *      |              |
+         *      |non-executable|    Cache, Buffer 가 Off 상태로 셋팅된 r1 이 들어간다.
+         *      |     0xC12    |
          *      |              |
          *      +--------------+ end of RAM
          *      |              |
          *      |   256 Entry  | -> 이 안의 Entry 들에는 Cache, Buffer 가 On 된
          *      |   (CB Set)   |    r1 값들이 들어간다.
-         *      |              |
+         *      |  executable  |
+         *      |     0xC0E    |
          *      +--------------+ start of RAM
          *      |              |
          *      |              |
          *      |  CB not set  | -> 여기는 r1(virt)가 start of RAM 보다 작으므로
-         *      |              |    Cache, Buffer 가 Off 상태로 셋팅된 r1 이 들어간다.
-         *      |              |
+         *      |non-executable|    Cache, Buffer 가 Off 상태로 셋팅된 r1 이 들어간다.
+         *      |     0xC12    |
          *      |              |
          *   0  +--------------+
          *
@@ -1249,9 +1250,18 @@ __armv7_mmu_cache_on:
 		blne	__setup_mmu  /*!!C 커널 압축하고 해제하고 실행하는데 필요한 page directory 설정 */
 
 		mov	r0, #0
+
+        /*!!C-----------------------------------------------------------------
+         * Cache Line에서 Clean을 통해 메모리에 반영하기 위해 WB에 썼다면
+         * WB의 내용을 모두 메모리에 반영해야 하는데 이를 drain 이라 함.
+         *
+         *  Cache Flush : cache line 의 Dirty Bit 를 0 으로 reset 
+         *  Cache Clean : cache line 의 Dirty Bit 가 1 인 것을 memory 에 반영.
+         *                이 때 WB 가 있다면 WB 에 쓰는 것.
+         -------------------------------------------------------------------*/
 		mcr	p15, 0, r0, c7, c10, 4	@ drain write buffer
 		tst	r11, #0xf		@ VMSA
-		mcrne	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
+		mcrne	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs -> Dirty Bit 를 0 으로 Reset
 #endif
 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
 		bic	r0, r0, #1 << 28	@ clear SCTLR.TRE
