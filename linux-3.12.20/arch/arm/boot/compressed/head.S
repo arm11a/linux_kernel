@@ -394,13 +394,25 @@ not_angel:
 
 restart:	adr	r0, LC0
 		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
+
+        /*!!C-----------------------------------------------------------------
+         * .L_user_stack_end
+         -------------------------------------------------------------------*/
 		ldr	sp, [r0, #28]
 
 		/*
 		 * We might be running at a different address.  We need
 		 * to fix up various pointers.
 		 */
+        /*!!C-----------------------------------------------------------------
+         * r0 = r1 currently means LC0
+         -------------------------------------------------------------------*/
 		sub	r0, r0, r1		@ calculate the delta offset
+
+        /*!!C-----------------------------------------------------------------
+         * r6  = _edata(zImage End Address) + r0
+         * r10 = input_data_end - 4  
+         -------------------------------------------------------------------*/
 		add	r6, r6, r0		@ _edata
 		add	r10, r10, r0		@ inflated kernel size location
 
@@ -409,18 +421,28 @@ restart:	adr	r0, LC0
 		 * decompressed kernel at the end of the compressed data
 		 * in little-endian form.
 		 */
-		ldrb	r9, [r10, #0]
-		ldrb	lr, [r10, #1]
-		orr	r9, r9, lr, lsl #8
-		ldrb	lr, [r10, #2]
-		ldrb	r10, [r10, #3]
-		orr	r9, r9, lr, lsl #16
-		orr	r9, r9, r10, lsl #24
+        /*!!C
+         * XINU (Little Endian) -> UNIX (Big Endian)
+         *
+         * mem = 0x78563412 (원래 size 자리에 저장된 메모리 값)
+         * r9  = 0x12345678 (아래 과정을 통해 r9 에 저장된 값)
+         */
+		ldrb	r9, [r10, #0]      /*!!C r9 = *(r10 + 0)      r9 = 0x78 */
+		ldrb	lr, [r10, #1]      /*!!C lr = *(r10 + 1)      lr = 0x56 */
+		orr	r9, r9, lr, lsl #8     /*!!C r9 = r9 | lr << 8    r9 = 0x78 | 0x5600 */
+		ldrb	lr, [r10, #2]      /*!!C lr = *(r10 + 2)      lr = 0x34 */
+		ldrb	r10, [r10, #3]     /*!!C r10 = *(r10 + 3)     r10 = 0x12 */
+		orr	r9, r9, lr, lsl #16    /*!!C r9 = r9 | lr << 16   r9 = 0x5678 | 0x340000 */
+		orr	r9, r9, r10, lsl #24   /*!!C r9 = r9 | r10 << 24  r9 = 0x345678 | 0x12000000 */
 
 #ifndef CONFIG_ZBOOT_ROM
 		/* malloc space is above the relocated stack (64k max) */
+
+        /*!!C
+         * sp 의 위치를 LC0 값을 더해서 위치 조정 
+         */
 		add	sp, sp, r0
-		add	r10, sp, #0x10000
+		add	r10, sp, #0x10000    /*!!C 64k */
 #else
 		/*
 		 * With ZBOOT_ROM the bss/stack is non relocatable,
@@ -433,12 +455,12 @@ restart:	adr	r0, LC0
 		mov	r5, #0			@ init dtb size to 0
 #ifdef CONFIG_ARM_APPENDED_DTB
 /*
- *   r0  = delta
+ *   r0  = delta (현재 0)
  *   r2  = BSS start
  *   r3  = BSS end
- *   r4  = final kernel address (possibly with LSB set)
+ *   r4  = final kernel address (possibly with LSB set) - 압축풀린 image 의 시작주소 
  *   r5  = appended dtb size (still unknown)
- *   r6  = _edata
+ *   r6  = _edata (zImage End Address)
  *   r7  = architecture ID
  *   r8  = atags/device tree pointer
  *   r9  = size of decompressed image
@@ -457,6 +479,10 @@ restart:	adr	r0, LC0
 #else
 		ldr	r1, =0xd00dfeed
 #endif
+        /*!!C
+         * zImage 끝의 값을 위의 r1 값과 비교하여
+         * 다르면 not found -> dtb_check_done 수행 
+         */
 		cmp	lr, r1
 		bne	dtb_check_done		@ not found
 
@@ -465,16 +491,21 @@ restart:	adr	r0, LC0
 		 * OK... Let's do some funky business here.
 		 * If we do have a DTB appended to zImage, and we do have
 		 * an ATAG list around, we want the later to be translated
-		 * and folded into the former here.  To be on the safe side,
+		 * and folded into the former here. To be on the safe side,
 		 * let's temporarily move  the stack away into the malloc
 		 * area.  No GOT fixup has occurred yet, but none of the
 		 * code we're about to call uses any global variable.
 		*/
-		add	sp, sp, #0x10000
+		add	sp, sp, #0x10000  /*!!C 64 k */
 		stmfd	sp!, {r0-r3, ip, lr}
-		mov	r0, r8
-		mov	r1, r6
-		sub	r2, sp, r6
+		mov	r0, r8       /*!!C atags pointer */
+		mov	r1, r6       /*!!C zImage End Address */
+		sub	r2, sp, r6   /*!!C stack pointer 와 zImage 의 차이 */
+
+        /*!!C
+         * atags 로 넘어온 것들을 zImage 바로 뒤의 fdt 자료구조에 
+         * 넣어준다.
+         */
 		bl	atags_to_fdt
 
 		/*
@@ -482,8 +513,15 @@ restart:	adr	r0, LC0
 		 * pointed by r8.  Try the typical 0x100 offset from start
 		 * of RAM and hope for the best.
 		 */
+
+        /*!!C r0 = atags_to_fdt 의 리턴 값 -> 1 인지 검사 */
 		cmp	r0, #1
 		sub	r0, r4, #TEXT_OFFSET
+
+        /*!!C
+         * restart 직전에 cache on skip 했을 경우 1 로 설정되어
+         * 있을 것이고, 아니면 0 일 것이다.
+         */
 		bic	r0, r0, #1
 		add	r0, r0, #0x100
 		mov	r1, r6
@@ -494,6 +532,11 @@ restart:	adr	r0, LC0
 		sub	sp, sp, #0x10000
 #endif
 
+        /*!!C
+         * 앞으로 변환된 DTB 를 사용한다.
+         * 기존 인자로 받은 r8 (atags list)을 DTB pointer 로
+         * 변환한다.
+         */
 		mov	r8, r6			@ use the appended device tree
 
 		/*
@@ -502,10 +545,20 @@ restart:	adr	r0, LC0
 		 * kernel size to compensate if that .bss size is larger
 		 * than the relocated code.
 		 */
+
+        /*!!C
+         * http://www.iamroot.org/xe/Kernel_10_ARM/179812 그림 참조 
+         */
 		ldr	r5, =_kernel_bss_size
 		adr	r1, wont_overwrite
 		sub	r1, r6, r1
-		subs	r1, r5, r1
+		subs	r1, r5, r1   /*!!C _kernel_bss_size - (zImage end - wont_overwrite) */
+
+        /*!!C
+         * r5 > r1 이어야만 addhi 가 수행됨.
+         * r9 이 decompress image 의 size 이므로 이 size 를 조정하는 작업임.
+         */
+        /*!!C hi => carry = 1 && zero = 0 */
 		addhi	r9, r9, r1
 
 		/* Get the dtb's size */
@@ -519,12 +572,23 @@ restart:	adr	r0, LC0
 #endif
 
 		/* preserve 64-bit alignment */
-		add	r5, r5, #7
-		bic	r5, r5, #7
+		add	r5, r5, #7   /*!!E r5=11 -> 18 */
+		bic	r5, r5, #7   /*!!E r5=16 */
 
 		/* relocate some pointers past the appended dtb */
+        /*!!C
+         * r6 는 zImage 의 끝이므로 dtb size 를 더한 값으로 변경.
+         */
 		add	r6, r6, r5
+
+        /*!!C
+         * r10 은 http://www.iamroot.org/xe/Kernel_10_ARM/179812 그림 참조. 
+         */
 		add	r10, r10, r5
+
+        /*!!C
+         * 현재 sp 의 위치는 ?
+         */
 		add	sp, sp, r5
 dtb_check_done:
 #endif
@@ -1258,6 +1322,9 @@ __armv7_mmu_cache_on:
          *  Cache Flush : cache line 의 Dirty Bit 를 0 으로 reset 
          *  Cache Clean : cache line 의 Dirty Bit 가 1 인 것을 memory 에 반영.
          *                이 때 WB 가 있다면 WB 에 쓰는 것.
+         *
+         * ARM 문서의 VMSA 챕터에서 cp15 관련 부분 보면 됨.
+         * Organization of the CP15 registers in a VMSA implementation on page B3-1469
          -------------------------------------------------------------------*/
 		mcr	p15, 0, r0, c7, c10, 4	@ drain write buffer
 		tst	r11, #0xf		@ VMSA
@@ -1274,6 +1341,9 @@ __armv7_mmu_cache_on:
 #ifdef CONFIG_CPU_ENDIAN_BE8
 		orr	r0, r0, #1 << 25	@ big-endian page tables
 #endif
+        /*!!C
+         * r6 <= Page Table Base Register 를 담아둔다.
+         */
 		mrcne   p15, 0, r6, c2, c0, 2   @ read ttb control reg
 		orrne	r0, r0, #1		@ MMU enabled
 		movne	r1, #0xfffffffd		@ domain 0 = client
@@ -1283,11 +1353,28 @@ __armv7_mmu_cache_on:
 		mcrne	p15, 0, r1, c3, c0, 0	@ load domain access control
 		mcrne   p15, 0, r6, c2, c0, 2   @ load ttb control
 #endif
-		mcr	p15, 0, r0, c7, c5, 4	@ ISB
+
+        /*!!Q
+         * 왜 아래와 같은 짓거리를 할까 ?
+         * ARM 문서에 설명이 나와있으며 OB 들의 해석을 보면 다음과 같다.
+         *
+         * ISB는 페이지테이블이 변경될 경우 기존에 명령어 파이프라인에
+         * 들어있던 명령들이 잘못된 주소를 참조할 수 있으므로,
+         * 해당 ISB 명령 뒤에 따라오던 파이프라인 내의 명령들을
+         * 비우는 역할을 합니다. 
+         * (비운다.. 즉 ISB 명령이 파이프라인을 완전히 빠져나갈때까지
+         * 다른 명령들이 파이프라인으로 들어올 수 없다는 얘기입니다.
+         * 물론 ISB 뒤에 따라온 이미 파이프라인에 들어온 명령들은 버려집니다.)
+         */
+		mcr	p15, 0, r0, c7, c5, 4	@ ISB (Instruction Sync Barrier)
 		mcr	p15, 0, r0, c1, c0, 0	@ load control register
 		mrc	p15, 0, r0, c1, c0, 0	@ and read it back
 		mov	r0, #0
 		mcr	p15, 0, r0, c7, c5, 4	@ ISB
+
+        /*!!C
+         * cache_on 다음의 restart label 로 복귀 
+         */
 		mov	pc, r12
 
 __fa526_cache_on:
