@@ -94,6 +94,7 @@
 
 
 6. Kernel Image (make 시 V=1 로 하면 빌드 과정을 Detail 하게 볼 수 있음)
+   설명 최고 url : http://blee74.tistory.com/entry/11
 
           objcopy          gzip               as            ld            objcopy
    vmlinux ------>  Image -------> piggy.gz -----> piggy.o ----> vmlinux --------> zImage

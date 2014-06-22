@@ -291,7 +291,7 @@ not_angel:
          *          |              |
          *          +--------------+
          *          |              |
-         *          |              |-> r4 = +0x8000 (32k) (uncompressed image start)
+         *          |              |-> r4 = +0x8000 (32k) (decompressed image start)
          *          |     (1)      |
          *          +--------------+-> 128m start (0x50000000)
          *
@@ -307,7 +307,7 @@ not_angel:
          *          +--------------+-> 128m end
          *          |              |
          *          |              |
-         *          |              |-> r4 = +0x8000 (32k) (uncompressed image start)
+         *          |              |-> r4 = +0x8000 (32k) (decompressed image start)
          *          |              |
          *          |              |-> r0 = pc + zImage size + 16k + 1m
          *          |              |
@@ -322,7 +322,7 @@ not_angel:
          *
          *
          *  case(3) r0 < r4 인 경우 두번째 
-         *          zImage 를 r4 지점보다 낮을 곳에 올리게 되면 아래와 같이 uncompressed
+         *          zImage 를 r4 지점보다 낮을 곳에 올리게 되면 아래와 같이 decompressed
          *          image start 지점이 zImage 를 overwrite 할 수 있다.
          *          이 때는 cache on 으로 가지 않고 restart label 로 간다. 
          *
@@ -333,7 +333,7 @@ not_angel:
          *          |              |
          *          +--------------+ _end
          *          |              |
-         *          |              |-> r4 = +0x8000 (32k) (uncompressed image start)
+         *          |              |-> r4 = +0x8000 (32k) (decompressed image start)
          *          |    zImage    |
          *          |              |-> r0 = pc
          *          +--------------+
@@ -393,11 +393,20 @@ not_angel:
 		blcs	cache_on
 
 restart:	adr	r0, LC0
-		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
 
         /*!!C-----------------------------------------------------------------
-         * .L_user_stack_end
+            .word	LC0			    @ r1
+            .word	__bss_start		@ r2
+            .word	_end			@ r3
+            .word	_edata			@ r6
+            .word	input_data_end - 4	@ r10 (inflated size location)
+            .word	_got_start		@ r11
+            .word	_got_end		@ ip
+            .word	.L_user_stack_end	@ sp
+            .word	_end - restart + 16384 + 1024*1024
+            .size	LC0, . - LC0
          -------------------------------------------------------------------*/
+		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
 		ldr	sp, [r0, #28]
 
 		/*
@@ -405,28 +414,36 @@ restart:	adr	r0, LC0
 		 * to fix up various pointers.
 		 */
         /*!!C-----------------------------------------------------------------
-         * r0 = r1 currently means LC0
+         * LC0 label 의 주소(r0)와 LC0 의 첫번째 word 의 값(r1)의 차이를 계산.
+         * 그런데, r1 의 값 자체가 LC0 이기 때문에 r0 - r1 은 정상적으로 로드되어
+         * 수행되고 있다면 이 값은 0 이 된다.
+         * 하지만, 차이가 난다면 그 차이(delta offset)를 보정하기 위해 차이를 r0 에
+         * 저장했다가 각 pointer 들의 위치를 조정해주어야 한다. 
          -------------------------------------------------------------------*/
 		sub	r0, r0, r1		@ calculate the delta offset
 
         /*!!C-----------------------------------------------------------------
-         * r6  = _edata(zImage End Address) + r0
-         * r10 = input_data_end - 4  
+         * r6 = zImage End(r6) + delta offset(r0)
+         * r10 = (input_data_end - 4) + delta offset(r0)
+         *
+         * input_data_end 는 압축한 piggy.gzip 의 끝을 나타냄. -> piggy.gzip.S 에 정의.
+         * r10 에는 압축한 
          -------------------------------------------------------------------*/
 		add	r6, r6, r0		@ _edata
 		add	r10, r10, r0		@ inflated kernel size location
 
-		/*
+        /*!!C-----------------------------------------------------------------
 		 * The kernel build system appends the size of the
 		 * decompressed kernel at the end of the compressed data
 		 * in little-endian form.
 		 */
         /*!!C
-         * XINU (Little Endian) -> UNIX (Big Endian)
+         * UNIX (Big Endian)
+         * XINU (Little Endian)
          *
          * mem = 0x78563412 (원래 size 자리에 저장된 메모리 값)
          * r9  = 0x12345678 (아래 과정을 통해 r9 에 저장된 값)
-         */
+         -------------------------------------------------------------------*/
 		ldrb	r9, [r10, #0]      /*!!C r9 = *(r10 + 0)      r9 = 0x78 */
 		ldrb	lr, [r10, #1]      /*!!C lr = *(r10 + 1)      lr = 0x56 */
 		orr	r9, r9, lr, lsl #8     /*!!C r9 = r9 | lr << 8    r9 = 0x78 | 0x5600 */
@@ -588,6 +605,7 @@ restart:	adr	r0, LC0
 
         /*!!C
          * 현재 sp 의 위치는 ?
+         * 20140621
          */
 		add	sp, sp, r5
 dtb_check_done:
@@ -1022,7 +1040,7 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
          *
          *  r6 = CB_BITS | 0x02
          *  r1 = 0xC12
-         *  r4 = xxx + TEXT_OFFSET + 1  : start of uncompressed image + 1
+         *  r4 = xxx + TEXT_OFFSET + 1  : start of decompressed image + 1
          *  r3 = (r4 - 16k) & ~(0x3fff) : start of page table 
          *  r2 = r3 + 16k               : end of page table
          *  r0 = r3                     : start of page table
