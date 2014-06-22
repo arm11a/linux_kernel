@@ -103,16 +103,22 @@
                  : linux_kernel/linux-3.12.20
 
     (2) Image    : Stripped kernel binary (binary object)      
+                 : (1) 의 vmlinux 파일에서 .comment, symbol, relocation 제거한 파일 
                  : linux_kernel/linux-3.12.20/arch/arm/boot
 
     (3) piggy.gz : Compressed kernel binary
+                 : Image 파일을 gzip 으로 압축한 것.
 
-    (4) asm wrapper around piggy.gz + bootstrap code
+    (4) piggy.o  : piggy.gz 을 데이터로 포함하고 있는 giggy.gzip.S 를
+                   컴파일하여 piggy.o 파일 생성 
 
     (5) vmlinux  : Composite kernel image (ELF Object)         
+                 : piggy.o + head.o + misc.o
                  : linux_kernel/linux-3.12.20/arch/arm/boot/compressed
 
     (6) zImage   : Kernel image for bootloader (binary object) 
+                 : (5) 의 vmlinux 파일에서 .comment, symbol, relocation 제거 후
+                   objcopy 로 zImage 생성 
                  : linux_kernel/linux-3.12.20/arch/arm/boot
 
     +---------------------+----------------------------------+-----------+
