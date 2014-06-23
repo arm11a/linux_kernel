@@ -394,18 +394,6 @@ not_angel:
 
 restart:	adr	r0, LC0
 
-        /*!!C-----------------------------------------------------------------
-            .word	LC0			    @ r1
-            .word	__bss_start		@ r2
-            .word	_end			@ r3
-            .word	_edata			@ r6
-            .word	input_data_end - 4	@ r10 (inflated size location)
-            .word	_got_start		@ r11
-            .word	_got_end		@ ip
-            .word	.L_user_stack_end	@ sp
-            .word	_end - restart + 16384 + 1024*1024
-            .size	LC0, . - LC0
-         -------------------------------------------------------------------*/
 		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
 		ldr	sp, [r0, #28]
 
@@ -419,6 +407,14 @@ restart:	adr	r0, LC0
          * 수행되고 있다면 이 값은 0 이 된다.
          * 하지만, 차이가 난다면 그 차이(delta offset)를 보정하기 위해 차이를 r0 에
          * 저장했다가 각 pointer 들의 위치를 조정해주어야 한다. 
+         *
+         * LC0 는 컴파일러가 임의로 만들어주는 지역레이블로서, 컴파일과 링크 등의 
+         * 과정을 거치면서 link script 를 통해 각 section 의 위치를 기록해두는
+         * 레이블로 사용된다. 그리고, LC0 레이블이 위치해야할 주소값을 LC0 레이블의
+         * 첫번째 word 에 기록해둔다.
+         * 만약 LC0 레이블 자체의 주소값이 해당 word 값과 일치하지 않는다면
+         * 이는 빌드과정에서 예상한 zImage 의 로드위치와 실제 로드한 위치가
+         * 다른 것일 수 있다. 따라서, 이는 보정해주어야 한다. 
          -------------------------------------------------------------------*/
 		sub	r0, r0, r1		@ calculate the delta offset
 
@@ -427,7 +423,11 @@ restart:	adr	r0, LC0
          * r10 = (input_data_end - 4) + delta offset(r0)
          *
          * input_data_end 는 압축한 piggy.gzip 의 끝을 나타냄. -> piggy.gzip.S 에 정의.
-         * r10 에는 압축한 
+         * r10 에는 decommpressed image(Image 파일) 의 크기가 들어있는 곳을 가리킴.
+         -------------------------------------------------------------------*/
+
+        /*!!C-----------------------------------------------------------------
+         * _edata = end of zImage = start of bss
          -------------------------------------------------------------------*/
 		add	r6, r6, r0		@ _edata
 		add	r10, r10, r0		@ inflated kernel size location
@@ -436,13 +436,16 @@ restart:	adr	r0, LC0
 		 * The kernel build system appends the size of the
 		 * decompressed kernel at the end of the compressed data
 		 * in little-endian form.
-		 */
-        /*!!C
+         -------------------------------------------------------------------*/
+        /*!!C-----------------------------------------------------------------
          * UNIX (Big Endian)
          * XINU (Little Endian)
          *
          * mem = 0x78563412 (원래 size 자리에 저장된 메모리 값)
          * r9  = 0x12345678 (아래 과정을 통해 r9 에 저장된 값)
+         *
+         * 즉, 아래 작업은 decommpressed kernel(Image 파일)의 크기를
+         * Endian 을 고려하여 읽어오는 작업.
          -------------------------------------------------------------------*/
 		ldrb	r9, [r10, #0]      /*!!C r9 = *(r10 + 0)      r9 = 0x78 */
 		ldrb	lr, [r10, #1]      /*!!C lr = *(r10 + 1)      lr = 0x56 */
@@ -455,11 +458,14 @@ restart:	adr	r0, LC0
 #ifndef CONFIG_ZBOOT_ROM
 		/* malloc space is above the relocated stack (64k max) */
 
-        /*!!C
-         * sp 의 위치를 LC0 값을 더해서 위치 조정 
-         */
+        /*!!C-----------------------------------------------------------------
+         * sp 의 위치에서 delta offset 값을 조정한 후
+         * 64 kb 더한 값(malloc 영역)을 r10 에 저장.
+         * 즉, stack end + 64 kb
+         * sp 는 stack end 자리에 그대로 있음. 
+         -------------------------------------------------------------------*/
 		add	sp, sp, r0
-		add	r10, sp, #0x10000    /*!!C 64k */
+		add	r10, sp, #0x10000
 #else
 		/*
 		 * With ZBOOT_ROM the bss/stack is non relocatable,
@@ -472,7 +478,7 @@ restart:	adr	r0, LC0
 		mov	r5, #0			@ init dtb size to 0
 #ifdef CONFIG_ARM_APPENDED_DTB
 /*
- *   r0  = delta (현재 0)
+ *   r0  = delta (문제없이 로딩했다면 현재 0)
  *   r2  = BSS start
  *   r3  = BSS end
  *   r4  = final kernel address (possibly with LSB set) - 압축풀린 image 의 시작주소 
@@ -496,10 +502,11 @@ restart:	adr	r0, LC0
 #else
 		ldr	r1, =0xd00dfeed
 #endif
-        /*!!C
-         * zImage 끝의 값을 위의 r1 값과 비교하여
-         * 다르면 not found -> dtb_check_done 수행 
-         */
+        /*!!C-----------------------------------------------------------------
+         * zImage 끝의 값(DTB 가 있다면 DTB 위치의 처음 4 byte)을 위의 r1 값과
+         * 비교하여 다르면 not found -> dtb_check_done 수행 
+         * 즉, DTB 의 시작 magic number 를 비교하여 다르면 dtb check 과정 불필요.
+         -------------------------------------------------------------------*/
 		cmp	lr, r1
 		bne	dtb_check_done		@ not found
 
@@ -512,48 +519,81 @@ restart:	adr	r0, LC0
 		 * let's temporarily move  the stack away into the malloc
 		 * area.  No GOT fixup has occurred yet, but none of the
 		 * code we're about to call uses any global variable.
-		*/
-		add	sp, sp, #0x10000  /*!!C 64 k */
+		 */
+
+        /*!!C-----------------------------------------------------------------
+         * sp 를 malloc 위로 이동 (1) -> (2)
+         * Translated DTB = bss + stack + malloc
+         *
+         *          +-----------+ <-- sp (2)
+         *          |   malloc  |     ^
+         *   (1)sp  +-----------+     |
+         *          |   stack   |     | DTB
+         *          +-----------+     |
+         *          |    bss    |     v
+         *          +-----------+ <-- r6
+         *          |           |
+         *          |  zImage   |
+         *          |           |
+         -------------------------------------------------------------------*/
+		add	sp, sp, #0x10000
 		stmfd	sp!, {r0-r3, ip, lr}
 		mov	r0, r8       /*!!C atags pointer */
 		mov	r1, r6       /*!!C zImage End Address */
-		sub	r2, sp, r6   /*!!C stack pointer 와 zImage 의 차이 */
+		sub	r2, sp, r6
 
-        /*!!C
-         * atags 로 넘어온 것들을 zImage 바로 뒤의 fdt 자료구조에 
-         * 넣어준다.
-         */
+        /*!!C-----------------------------------------------------------------
+         * atags 로 넘어온 것들을 zImage End ~ Stack Pointer 사이 부분,
+         * 즉, bss + stack + malloc 합친 공간(=DTB)에 변환하여 저장하여 준다.
+         -------------------------------------------------------------------*/
 		bl	atags_to_fdt
 
-		/*
+        /*!!C-----------------------------------------------------------------
 		 * If returned value is 1, there is no ATAG at the location
 		 * pointed by r8.  Try the typical 0x100 offset from start
 		 * of RAM and hope for the best.
-		 */
-
-        /*!!C r0 = atags_to_fdt 의 리턴 값 -> 1 인지 검사 */
+         *
+         * r0 = atags_to_fdt 의 리턴 값 -> 1 인지 검사
+         -------------------------------------------------------------------*/
 		cmp	r0, #1
+
+        /*!!C-----------------------------------------------------------------
+         * r4 - 0x8000 = RAM 시작 주소 
+         -------------------------------------------------------------------*/
 		sub	r0, r4, #TEXT_OFFSET
 
-        /*!!C
-         * restart 직전에 cache on skip 했을 경우 1 로 설정되어
-         * 있을 것이고, 아니면 0 일 것이다.
-         */
+        /*!!C-----------------------------------------------------------------
+         * RAM 시작주소 + 0x100 번지에서 atag 를 한번 더 읽어본다. 
+         -------------------------------------------------------------------*/
 		bic	r0, r0, #1
 		add	r0, r0, #0x100
 		mov	r1, r6
 		sub	r2, sp, r6
 		bleq	atags_to_fdt
 
+        /*!!C-----------------------------------------------------------------
+         * malloc 위쪽으로 옮겼던 sp 를 다시 원래의 user_stack_end 로 복귀 (2) -> (1)
+         *
+         *          +-----------+ <-- sp (2)
+         *          |   malloc  |     ^
+         *   (1)sp  +-----------+     |
+         *          |   stack   |     | DTB
+         *          +-----------+     |
+         *          |    bss    |     v
+         *          +-----------+ <-- r6
+         *          |           |
+         *          |  zImage   |
+         *          |           |
+         -------------------------------------------------------------------*/
 		ldmfd	sp!, {r0-r3, ip, lr}
 		sub	sp, sp, #0x10000
 #endif
 
-        /*!!C
+        /*!!C-----------------------------------------------------------------
          * 앞으로 변환된 DTB 를 사용한다.
          * 기존 인자로 받은 r8 (atags list)을 DTB pointer 로
          * 변환한다.
-         */
+         -------------------------------------------------------------------*/
 		mov	r8, r6			@ use the appended device tree
 
 		/*
@@ -563,23 +603,53 @@ restart:	adr	r0, LC0
 		 * than the relocated code.
 		 */
 
-        /*!!C
+        /*!!C-----------------------------------------------------------------
          * http://www.iamroot.org/xe/Kernel_10_ARM/179812 그림 참조 
-         */
+         * _kernel_bss_size = 압축풀린 vmliux 의 bss size
+         *
+         * readelf -S linux-3.12.20/vmlinux 로 section header 정보를 보면...
+         * ...
+         * [Nr] Nme       Type      AddrSize  Off     Size    ES
+         * [26] .bss     NOBITS    c0500280  50826c  041d18  00 WA 0 0 64
+         * ...
+         * _kernel_bss_size = 0x041d18 (269592)
+         -------------------------------------------------------------------*/
 		ldr	r5, =_kernel_bss_size
 		adr	r1, wont_overwrite
 		sub	r1, r6, r1
-		subs	r1, r5, r1   /*!!C _kernel_bss_size - (zImage end - wont_overwrite) */
 
-        /*!!C
+        /*!!C-----------------------------------------------------------------
+         *     r5                        r1
+         * _kernel_bss_size - (zImage end - wont_overwrite)
+         *
+         * r5 > r1 보다 크면 overwrite 발생한다는 의미.
+         * 압축풀린 kernel bss 가 wont_overwrite label 을 넘어가므로.
+         -------------------------------------------------------------------*/
+		subs	r1, r5, r1
+
+        /*!!C-----------------------------------------------------------------
          * r5 > r1 이어야만 addhi 가 수행됨.
+         * 즉, overwrite 되는 상황.
          * r9 이 decompress image 의 size 이므로 이 size 를 조정하는 작업임.
-         */
+         -------------------------------------------------------------------*/
         /*!!C hi => carry = 1 && zero = 0 */
 		addhi	r9, r9, r1
 
 		/* Get the dtb's size */
+        /*!!C-----------------------------------------------------------------
+         * DTB 의 시작 4 byte 는 Magic Number 가 오고, 그 다음 4 byte 는
+         * DTB 의 Size 가 들어간다.
+         *
+         * linux-3.12.20/arch/arm/boot/dts$] hexdump exynos5420-smdk5420.dtb | head -n1
+         * 0000000 0dd0 edfe 0000 9e3c 0000 3800 0000 b039
+         *         --------- ---------
+         *         magic no  dtb size
+         *
+         * magic number 가 0xd00dfeed 일때 big endian 이므로 dtb size 는 
+         * big endian 방식으로 읽으면 0x00003c9e = 15518
+         -------------------------------------------------------------------*/
 		ldr	r5, [r6, #4]
+
 #ifndef __ARMEB__
 		/* convert r5 (dtb size) to little endian */
 		eor	r1, r5, r5, ror #16
@@ -589,25 +659,69 @@ restart:	adr	r0, LC0
 #endif
 
 		/* preserve 64-bit alignment */
+        /*!!C-----------------------------------------------------------------
+         * DTB Size 값을 8 byte align 을 맞춘 값으로 변경한다. 
+         * 15518 -> 15520
+         -------------------------------------------------------------------*/
 		add	r5, r5, #7   /*!!E r5=11 -> 18 */
 		bic	r5, r5, #7   /*!!E r5=16 */
 
 		/* relocate some pointers past the appended dtb */
-        /*!!C
-         * r6 는 zImage 의 끝이므로 dtb size 를 더한 값으로 변경.
-         */
+        /*!!C-----------------------------------------------------------------
+         * r6 는 zImage 의 끝이었으므로 여기에 dtb size 를 더한 값으로 변경.
+         * (1) -> (2)
+         *
+         *          +-----------+ <-- r6 (2) = (1) + dtb size
+         *          |           |
+         *          |    DTB    |
+         *          |           |
+         *          +-----------+ <-- r6 (1)
+         *          |           |
+         *          |  zImage   |
+         *          |           |
+         -------------------------------------------------------------------*/
 		add	r6, r6, r5
 
-        /*!!C
-         * r10 은 http://www.iamroot.org/xe/Kernel_10_ARM/179812 그림 참조. 
-         */
+        /*!!C-----------------------------------------------------------------
+         * r10 의 위치를 (1)에서 (2)로 변경 
+         *
+         *          +-----------+ <-- r10 + dtb size (15520) (2)
+         *          |           |
+         *          +-----------+ <-- r10 (1)
+         *          |   malloc  |
+         *          +-----------+
+         *          |   stack   |
+         *          +-----------+
+         *          |    bss    |
+         *          +-----------+
+         *          |           |
+         *          |  zImage   |
+         *          |           |
+         -------------------------------------------------------------------*/
 		add	r10, r10, r5
 
+        /*!!C-----------------------------------------------------------------
+         * sp 의 위치를 (1)에서 (2)로 변경 
+         *
+         *          +-----------+ <-- sp + dtb size (15520) (2)
+         *          |           |
+         *          +-----------+ <-- sp (1)
+         *          |   malloc  |
+         *          +-----------+
+         *          |   stack   |
+         *          +-----------+
+         *          |    bss    |
+         *          +-----------+
+         *          |           |
+         *          |  zImage   |
+         *          |           |
+         -------------------------------------------------------------------*/
+		add	sp, sp, r5
+
         /*!!C
-         * 현재 sp 의 위치는 ?
          * 20140621
          */
-		add	sp, sp, r5
+
 dtb_check_done:
 #endif
 
@@ -806,6 +920,17 @@ not_relocated:	mov	r0, #0
 
 		.align	2
 		.type	LC0, #object
+
+
+        /*!!C-----------------------------------------------------------------
+         * 다음은 arch/arm/boot/compressed 디렉토리의 vmlinux  파일에 대한
+         * objdump 에서 LC0 부분만을 발췌한 것.
+         *
+         * 000002d8 <LC0>:
+         *   2d8:	000002d8 0028feb0 0028fed4 0028feb0     ......(...(...(.
+         *   2e8:	0028fe65 0028fe78 0028fea8 00290ed8     e.(.x.(...(...).
+         *   2f8:	00393e0c e320f000                       .>9... .
+         -------------------------------------------------------------------*/
 LC0:		.word	LC0			@ r1
 		.word	__bss_start		@ r2
 		.word	_end			@ r3

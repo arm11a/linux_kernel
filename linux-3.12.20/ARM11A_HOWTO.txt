@@ -129,3 +129,7 @@
     |                     +----------------------------------+-----------+
     |                     |  초기 데이터 (head.o, misc.o)    | got, data |
     +---------------------+----------------------------------+-----------+
+
+
+7. GOT, PLT 관련 Great Article.
+    http://eli.thegreenplace.net/2011/11/03/position-independent-code-pic-in-shared-libraries/
