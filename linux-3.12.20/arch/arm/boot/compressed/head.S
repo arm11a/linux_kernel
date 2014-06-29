@@ -729,18 +729,44 @@ dtb_check_done:
  *   r9  = size of decompressed image
  *   r10 = end of this image, including  bss/stack/malloc space if non XIP
  * We basically want:
- *   r4 - 16k page directory >= r10 -> OK
+ *   r4 - 16k page directory >= r10 -> OK ---> (1)
  *   r4 + image length <= address of wont_overwrite -> OK
  * Note: the possible LSB in r4 is harmless here.
  */
+
+        /*!!C-----------------------------------------------------------------
+         * r10 + 16k (page table) 이 r4 (decompressed image start)보다
+         * 크지 않으면 wont_overwrite 로 분기 
+         -------------------------------------------------------------------*/
 		add	r10, r10, #16384
 		cmp	r4, r10
+
+        /*!!C-----------------------------------------------------------------
+         * r4 >= r10 + 16k 이면 wont_overwrite 분기 
+         *  - zImage가 r4 보다 밑에 있지만 문제없는 경우 -> OK
+         -------------------------------------------------------------------*/
 		bhs	wont_overwrite
+
+        /*!!C-----------------------------------------------------------------
+         * 3 가지 경우가 남아 있다.
+         *  - zImage가 r4 보다 위에 있는 경우, overwrite 경우 
+         *  - zImage가 r4 보다 위에 있는 경우, wont overwrite 경우 
+         *  - zImage가 r4 보다 아래에 있는 경우, overwrite 경우 
+         -------------------------------------------------------------------*/
 		add	r10, r4, r9
 		adr	r9, wont_overwrite
 		cmp	r10, r9
+
+        /*!!C-----------------------------------------------------------------
+         *  - zImage가 r4 보다 위에 있는 경우, wont overwrite 경우 -> 분기 
+         -------------------------------------------------------------------*/
 		bls	wont_overwrite
 
+        /*!!C-----------------------------------------------------------------
+         * 2 가지 경우가 남아 있다.
+         *  - zImage가 r4 보다 위에 있는 경우, overwrite 경우 
+         *  - zImage가 r4 보다 아래에 있는 경우, overwrite 경우 
+         -------------------------------------------------------------------*/
 /*
  * Relocate ourselves past the end of the decompressed kernel.
  *   r6  = _edata
@@ -753,10 +779,17 @@ dtb_check_done:
 		 * the relocation code added. This avoids overwriting
 		 * ourself when the offset is small.
 		 */
+        /*!!Q-----------------------------------------------------------------
+         * 이 offset 이 작다는 case 가 어떤건지 정확히 잘 ??
+         * reloc_code_end - restart 만큼을 중복으로 계산해 주는 이유...
+         -------------------------------------------------------------------*/
 		add	r10, r10, #((reloc_code_end - restart + 256) & ~255)
 		bic	r10, r10, #255
 
 		/* Get start of code we want to copy and align it down. */
+        /*!!C-----------------------------------------------------------------
+         * restart lable 주소값을 32 byte align
+         -------------------------------------------------------------------*/
 		adr	r5, restart
 		bic	r5, r5, #31
 
@@ -774,9 +807,42 @@ dtb_check_done:
 1:
 #endif
 
+        /*!!C-----------------------------------------------------------------
+         * r6 = _edata + dtb size
+         * r5 = restart address
+         * r9 = restart ~ dtb end
+         -------------------------------------------------------------------*/
 		sub	r9, r6, r5		@ size to copy
 		add	r9, r9, #31		@ rounded up to a multiple
 		bic	r9, r9, #31		@ ... of 32 bytes
+
+        /*!!C-----------------------------------------------------------------
+         * dtb size 는 0 인 상태로 여기로 왔을 수 있다.
+         * dtb size 가 약 15 k 라면 아래와 같은 그림이 된다.
+         *
+         *          +-----------+
+         *      r6->|   malloc  |----------------- dtb end
+         *  (source)+-----------+               ^
+         *      |   |   stack   |               |
+         *      V   +-----------|               r9
+         *          |    bss    |               |
+         *          +-----------+ dtb start     |
+         *          |           + reloc end     |
+         *          |           |               v
+         *          |           + restart (r5) ---
+         *          +-----------+
+         *          |           |
+         *          | --------  + finally r9 = r10 + r9 ==> (destination)
+         *          |     |     |
+         *          |     v     |
+         *          |           + r10 = decomp end + (reloc end - restart)
+         *          |           |
+         *          +-----------+ decomp end
+         *          |           |
+         *
+         * 위 그림은 zImage 가 decomp 위쪽에 로드된 경우이지만,
+         * 아래에 로드된 경우는 위 그림의 반대가 될 것이다.
+         -------------------------------------------------------------------*/
 		add	r6, r9, r5
 		add	r9, r9, r10
 
@@ -786,6 +852,10 @@ dtb_check_done:
 		bhi	1b
 
 		/* Preserve offset to relocated code. */
+        /*!!C-----------------------------------------------------------------
+         * r6 와 r9 는 위에서 쭈욱 copy 하고 난 후 최종 위치에 와 있다.
+         * 그 두 위치의 차이(offset)를 r6 에 담아둠.
+         -------------------------------------------------------------------*/
 		sub	r6, r9, r6
 
 #ifndef CONFIG_ZBOOT_ROM
@@ -793,14 +863,37 @@ dtb_check_done:
 		add	sp, sp, r6
 #endif
 
+        /*!!C-----------------------------------------------------------------
+         * r4 = decompress image start + 1
+         * r4 의 끝자리가 1 이 아닌 경우 cache_clean_flush 수행
+         * 앞에서 cache_on skip 했을 때 1 로 셋팅해두었었음.
+         -------------------------------------------------------------------*/
 		tst	r4, #1
 		bleq	cache_clean_flush
 
+        /*!!C-----------------------------------------------------------------
+         * relocation 한 restart 쪽으로 r0 를 옮김.
+         * 그리고, pc 를 해당 code 쪽으로 옮김.
+         -------------------------------------------------------------------*/
 		adr	r0, BSYM(restart)
 		add	r0, r0, r6
 		mov	pc, r0
 
+        /*!!C-----------------------------------------------------------------
+         * restart 로 가서 relocation 된 code 를 수행하면 이제부터는
+         * overwrite 문제가 없으므로 곧바로 wont_overwrite 로 분기하게 됨.
+         -------------------------------------------------------------------*/
+
+        /*!!C-----------------------------------------------------------------
+         * delta offset 은 로드가 다른 곳에 된 경우와, relocation 이 된 경우
+         * 둘 다 해당됨.
+         -------------------------------------------------------------------*/
+
 wont_overwrite:
+
+        /*!!C-----------------------------------------------------------------
+         * restart 의 첫 부분에서 delta offset 을 구함. -> r0
+         -------------------------------------------------------------------*/
 /*
  * If delta is zero, we are running at the address we were linked at.
  *   r0  = delta
@@ -814,9 +907,18 @@ wont_overwrite:
  *   r12 = GOT end
  *   sp  = stack pointer
  */
+        /*!!C-----------------------------------------------------------------
+         * r0 = 0 | r5 = 0 -> 0 -> not reloc 
+         * r0 = 1 | r5 = 0 -> 1 -> reloc 
+         * r0 = 0 | r5 = 1 -> 1 -> reloc 
+         * r0 = 1 | r5 = 1 -> 1 -> reloc 
+         -------------------------------------------------------------------*/
 		orrs	r1, r0, r5
 		beq	not_relocated
 
+        /*!!C-----------------------------------------------------------------
+         * GOT pointer 도 delta offset 만큼 옮겨줌.
+         -------------------------------------------------------------------*/
 		add	r11, r11, r0
 		add	r12, r12, r0
 
@@ -826,6 +928,9 @@ wont_overwrite:
 		 * we need to fix up pointers into the BSS region.
 		 * Note that the stack pointer has already been fixed up.
 		 */
+        /*!!C-----------------------------------------------------------------
+         * BSS Pointer 도 delta offset 만큼 옮겨줌.
+         -------------------------------------------------------------------*/
 		add	r2, r2, r0
 		add	r3, r3, r0
 
@@ -833,6 +938,12 @@ wont_overwrite:
 		 * Relocate all entries in the GOT table.
 		 * Bump bss entries to _edata + dtb size
 		 */
+        /*!!Q-----------------------------------------------------------------
+         * delta 조정된 GOT table 의 entry 값이 bss start~end 사이에 있으면
+         * dtb size 만큼 조정.
+         * GOT, PLT 에 대한 study 조금 더 필요.
+         * 왜 굳이 bss start ~ end 인지를 검사하는지 좀더 확인 필요.
+         -------------------------------------------------------------------*/
 1:		ldr	r1, [r11, #0]		@ relocate entries in the GOT
 		add	r1, r1, r0		@ This fixes up C references
 		cmp	r1, r2			@ if entry >= bss_start &&
@@ -843,6 +954,18 @@ wont_overwrite:
 		blo	1b
 
 		/* bump our bss pointers too */
+        /*!!C-----------------------------------------------------------------
+         *                                    ^
+         *          +-----------+             | bss start 이동
+         *          |   malloc  |-> dtd end  ---
+         *          +-----------+
+         *          |   stack   |
+         *          +-----------|
+         *          |    bss    |
+         *          +-----------+
+         *          |           +
+         * 20140628
+         -------------------------------------------------------------------*/
 		add	r2, r2, r5
 		add	r3, r3, r5
 
