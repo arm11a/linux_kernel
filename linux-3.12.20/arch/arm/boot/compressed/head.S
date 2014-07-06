@@ -986,6 +986,13 @@ wont_overwrite:
 #endif
 
 not_relocated:	mov	r0, #0
+
+        /*!!C-----------------------------------------------------------------
+         * cf> loop unrolling, SIMD
+         * 아마도 pipe line 을 깨지 않도록 해서 성능 향상을 위해
+         * 이렇게 처리한 듯...
+         * bss 를 0 으로 초기화. 
+         -------------------------------------------------------------------*/
 1:		str	r0, [r2], #4		@ clear bss
 		str	r0, [r2], #4
 		str	r0, [r2], #4
@@ -998,6 +1005,10 @@ not_relocated:	mov	r0, #0
 		 * That is indicated by the LSB in r4.
 		 * Do it now if so.
 		 */
+        /*!!C-----------------------------------------------------------------
+         * 앞에서 cache_on 을 skip 했으면 LSB 가 1 로 설정되어 있음.
+         * -> cache_on 수행 
+         -------------------------------------------------------------------*/
 		tst	r4, #1
 		bic	r4, r4, #1
 		blne	cache_on
@@ -1017,6 +1028,10 @@ not_relocated:	mov	r0, #0
 		bl	cache_clean_flush
 		bl	cache_off
 		mov	r1, r7			@ restore architecture number
+
+        /*!!C
+         * r8 = dtb pointer
+         */
 		mov	r2, r8			@ restore atags pointer
 
 #ifdef CONFIG_ARM_VIRT_EXT
@@ -1965,9 +1980,15 @@ __armv4_mmu_cache_off:
 		mov	pc, lr
 
 __armv7_mmu_cache_off:
-		mrc	p15, 0, r0, c1, c0
+		mrc	p15, 0, r0, c1, c0   /*!!C read control registr */
 #ifdef CONFIG_MMU
-		bic	r0, r0, #0x000d
+
+        /*!!C
+         * MMU disable
+         * Data Cache disable
+         * Should be 1
+         */
+		bic	r0, r0, #0x000d      /*!! 1101 */
 #else
 		bic	r0, r0, #0x000c
 #endif
@@ -1978,7 +1999,16 @@ __armv7_mmu_cache_off:
 #ifdef CONFIG_MMU
 		mcr	p15, 0, r0, c8, c7, 0	@ invalidate whole TLB
 #endif
+
+        /*!!C
+         * BTC : Branch Target Cache
+         */
 		mcr	p15, 0, r0, c7, c5, 6	@ invalidate BTC
+
+        /*!!C
+         * invalidate BTC 를 coprocessor 에게 시키고,
+         * 끝날 때까지 기다려준다.
+         */
 		mcr	p15, 0, r0, c7, c10, 4	@ DSB
 		mcr	p15, 0, r0, c7, c5, 4	@ ISB
 		mov	pc, r12
@@ -2032,23 +2062,51 @@ __armv7_mmu_cache_flush:
 		mrc	p15, 0, r10, c0, c1, 5	@ read ID_MMFR1
 		tst	r10, #0xf << 16		@ hierarchical cache (ARMv7)
 		mov	r10, #0
+
+        /*!!C-----------------------------------------------------------------
+         * if havard off
+         -------------------------------------------------------------------*/
 		beq	hierarchical
 		mcr	p15, 0, r10, c7, c14, 0	@ clean+invalidate D
 		b	iflush
 hierarchical:
+
+        /*!!C-----------------------------------------------------------------
+         * Data Memory Barrier
+         * 압축풀고 하는 과정에서 변경한 값들이 cache 에만 반영되어 있을 경우를
+         * 위해 memory 에 반영하는 작업 
+         -------------------------------------------------------------------*/
 		mcr	p15, 0, r10, c7, c10, 5	@ DMB
 		stmfd	sp!, {r0-r7, r9-r11}
+
+        /*!!C-----------------------------------------------------------------
+         * 첫번째 opcode 가 1 이라는거 명심하시오.
+         * loc = Level of Coherency
+         * Level of Coherency for the cache hierarchy 
+         *  -> 이게 무슨말인지 알아오시오.
+         *
+         * http://www.iamroot.org/xe/Kernel_10_ARM/179531 참고.
+         -------------------------------------------------------------------*/
 		mrc	p15, 1, r0, c0, c0, 1	@ read clidr
 		ands	r3, r0, #0x7000000	@ extract loc from clidr
 		mov	r3, r3, lsr #23		@ left align loc bit field
 		beq	finished		@ if loc is 0, then no need to clean
 		mov	r10, #0			@ start clean at cache level 0
 loop1:
+        /*!!C r2 = r10 = 0 */
 		add	r2, r10, r10, lsr #1	@ work out 3x current cache level
+
+        /*!!C r1 = r0 = clidr */
 		mov	r1, r0, lsr r2		@ extract cache type bits from clidr
 		and	r1, r1, #7		@ mask of the bits for current cache only
+
 		cmp	r1, #2			@ see what cache we have at this level
+
+        /*!!C LT ==> Negative Flag != Overflow Flag */
+        /*!!C r1 < 2 = 001 or 000 인 경우 */
+        /*!!C no cache 또는 Instruction cache only */
 		blt	skip			@ skip if no cache, or just i-cache
+
 		mcr	p15, 2, r10, c0, c0, 0	@ select current cache level in cssr
 		mcr	p15, 0, r10, c7, c5, 4	@ isb to sych the new cssr&csidr
 		mrc	p15, 1, r1, c0, c0, 0	@ read the new csidr
@@ -2080,11 +2138,23 @@ skip:
 finished:
 		ldmfd	sp!, {r0-r7, r9-r11}
 		mov	r10, #0			@ swith back to cache level 0
+
+        /*!!C-----------------------------------------------------------------
+         * Level 1 Cache
+         -------------------------------------------------------------------*/
 		mcr	p15, 2, r10, c0, c0, 0	@ select current cache level in cssr
 iflush:
+        /*!!C-----------------------------------------------------------------
+         * DSB : Data Synchronization Barrier
+         * ISB : Instruction Synchronization Barrier
+         * BTB : Branch Target Buffer -> 분기예측과 관련된 Buffer
+         *
+         * Branch Prediction : 분기 예측 
+         * DSB 을 앞뒤로 하는 이유를 좀 찾아보자.
+         -------------------------------------------------------------------*/
 		mcr	p15, 0, r10, c7, c10, 4	@ DSB
 		mcr	p15, 0, r10, c7, c5, 0	@ invalidate I+BTB
-		mcr	p15, 0, r10, c7, c10, 4	@ DSB
+		mcr	p15, 0, r10, c7, c10, 4	@ DSB   /*!!Q invalidate I+BTB 가 끝나길 wait ? */
 		mcr	p15, 0, r10, c7, c5, 4	@ ISB
 		mov	pc, lr
 

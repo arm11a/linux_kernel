@@ -62,6 +62,9 @@
 #endif
 #endif
 
+/*!!C
+ * 2^4(a multiple of 16)로 align, 빈공간은 0x90으로 채워지도록.
+ */
 #ifndef __ALIGN
 #define __ALIGN		.align 4,0x90
 #define __ALIGN_STR	".align 4,0x90"

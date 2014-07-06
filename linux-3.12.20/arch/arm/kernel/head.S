@@ -34,11 +34,19 @@
  * the least significant 16 bits to be 0x8000, but we could probably
  * relax this restriction to KERNEL_RAM_VADDR >= PAGE_OFFSET + 0x4000.
  */
+/*!!C
+ * KERNEL_RAM_VADDR = 0xC0008000
+ */
 #define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
 #if (KERNEL_RAM_VADDR & 0xffff) != 0x8000
 #error KERNEL_RAM_VADDR must start at 0xXXXX8000
 #endif
 
+/*!!C
+ * CONFIG_ARM_LPAE = Large Page ...
+ * => Page Table Level 2 로는 cover 가 안됨.
+ * => 그래서 0x5000 으로 확장
+ */
 #ifdef CONFIG_ARM_LPAE
 	/* LPAE requires an additional page for the PGD */
 #define PG_DIR_SIZE	0x5000
@@ -49,7 +57,7 @@
 #endif
 
 	.globl	swapper_pg_dir
-	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - PG_DIR_SIZE
+	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - PG_DIR_SIZE  /*!!C 0xc0004000 = start */
 
 	.macro	pgtbl, rd, phys
 	add	\rd, \phys, #TEXT_OFFSET - PG_DIR_SIZE
@@ -76,6 +84,10 @@
 	.arm
 
 	__HEAD
+
+    /*!!C
+     * 외부에서 볼 수 있는 symbol
+     */
 ENTRY(stext)
 
  THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.

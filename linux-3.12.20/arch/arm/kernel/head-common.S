@@ -151,8 +151,21 @@ ENDPROC(lookup_processor_type)
  */
 __lookup_processor_type:
 	adr	r3, __lookup_processor_type_data
+
+    /*!!C
+     * r3 = physical
+     * r4 = virtual
+     * r3 - r4 = offset
+     */
 	ldmia	r3, {r4 - r6}
 	sub	r3, r3, r4			@ get offset between virt&phys
+
+    /*!!C
+     * r5 = proc info begin
+     * virtual(r5) + offset(r3) = physical(r5)
+     * virtual(r6) + offset(r3) = physical(r6)
+     * 20140715
+     */
 	add	r5, r5, r3			@ convert virt addresses to
 	add	r6, r6, r3			@ physical address space
 1:	ldmia	r5, {r3, r4}			@ value, mask
