@@ -131,6 +131,7 @@ ENTRY(stext)
 	adr	r3, 2f
 	ldmia	r3, {r4, r8}
 	sub	r4, r3, r4			@ (PHYS_OFFSET - PAGE_OFFSET)
+
     /*!!C-----------------------------------------------------------------
      * physical RAM start address = PHYS_OFFSET
      * = PAGE_OFFSET + offset(r4)
