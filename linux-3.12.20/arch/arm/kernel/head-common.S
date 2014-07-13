@@ -43,16 +43,35 @@
  *  r2 either valid atags pointer, valid dtb pointer, or zero
  *  r5, r6 corrupted
  */
+/*!!C
+ * r1 = machine no, r2 = atags or dtb,
+ * r8 = phys_offset, r9 = cpuid, r10 = procinfo
+ */
 __vet_atags:
+    /*!!C
+     * r2(dtb pointer)가 align 안되어 있으면 1f 로 뛴다.
+     * 그리고, r2 = 0 로 바꾼 후 리턴. 
+     */
 	tst	r2, #0x3			@ aligned?
 	bne	1f
 
+    /*!!C
+     * dtb pointer 의 첫번째 값을 r5 로 로드 
+     */
 	ldr	r5, [r2, #0]
 #ifdef CONFIG_OF_FLATTREE
+    /*!!C
+     * dtb magic no 비교 
+     */
 	ldr	r6, =OF_DT_MAGIC		@ is it a DTB?
 	cmp	r5, r6
 	beq	2f
 #endif
+    /*!!C
+     * atags 유효 검사
+     * ATAG_CORE_SIZE = 5 (????)
+     * ATAG_CORE = atags magic number
+     */
 	cmp	r5, #ATAG_CORE_SIZE		@ is first tag ATAG_CORE?
 	cmpne	r5, #ATAG_CORE_SIZE_EMPTY
 	bne	1f
@@ -168,10 +187,23 @@ __lookup_processor_type:
      */
 	add	r5, r5, r3			@ convert virt addresses to
 	add	r6, r6, r3			@ physical address space
+
+    /*!!C
+     * table 의 value 와 내 cpuid 와 비교.
+     */
 1:	ldmia	r5, {r3, r4}			@ value, mask
 	and	r4, r4, r9			@ mask wanted bits
 	teq	r3, r4
+
+    /*!!C
+     * r3 = r4 이면 zero flag = 1 (2f 로 뛴다)
+     * 전체 비트가 다 같아야 zero flag = 1
+     */
 	beq	2f
+
+    /*!!C
+     * 빌드할 때 asm-offsets.h 에 size 가 결정되어서 작성되어 있다.
+     */
 	add	r5, r5, #PROC_INFO_SZ		@ sizeof(proc_info_list)
 	cmp	r5, r6
 	blo	1b

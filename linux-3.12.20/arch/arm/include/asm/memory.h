@@ -176,6 +176,10 @@
 extern unsigned long __pv_phys_offset;
 #define PHYS_OFFSET __pv_phys_offset
 
+/*!!C
+ * http://www.iamroot.org/xe/index.php?mid=Kernel_10_ARM&page=8&document_srl=184583
+ * http://stackoverflow.com/questions/16909655/virtual-to-physical-address-conversion-in-linux-kernel
+ */
 #define __pv_stub(from,to,instr,type)			\
 	__asm__("@ __pv_stub\n"				\
 	"1:	" instr "	%0, %1, %2\n"		\
