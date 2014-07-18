@@ -1,3 +1,4 @@
+__pv_stub
 /*
  *  linux/arch/arm/kernel/head.S
  *
@@ -262,7 +263,8 @@ __create_page_tables:
 	add	r6, r6, r0			@ phys __turn_mmu_on_end
 
     /*!!C-----------------------------------------------------------------
-     * SECTION_SHIFT = 20
+     * SECTION_SHIFT = 20 -> means 1 MB section size
+     * __turn_mmu_on 와 __turn_mmu_on_end 가 몇번째 1 MB section 인지 구함. 
      -------------------------------------------------------------------*/
 	mov	r5, r5, lsr #SECTION_SHIFT
 	mov	r6, r6, lsr #SECTION_SHIFT
@@ -273,8 +275,8 @@ __create_page_tables:
      * r7 = __cpu_mm_mmu_flags
      *
      * Page Table Entry 들을 다음과 같은 값으로 모두 설정하는 작업.
-     *  __turn_mmu_on 의 상위 12 bit | __cpu_mm_mmu_flags
-     *      section base address       권한,cacheable,buffable
+     *  __turn_mmu_on physical 주소의 상위 12 bit | __cpu_mm_mmu_flags
+     *      section base address                  권한,cacheable,buffable
      -------------------------------------------------------------------*/
 
     /*!!C-----------------------------------------------------------------
@@ -323,7 +325,7 @@ __create_page_tables:
     /*!!C-----------------------------------------------------------------
      * r0 가 4 byte씩 움직이면서 entry pointer 가 되고,
      * 각 entry 에는 physical offset | mmu flags 값들로 채워진다.
-     * 그 범위가 bss end 에 해당하는 entry 까지.
+     * 그 범위가 PAGE_OFFSET 을 가리키는 entry 부터 bss end 에 해당하는 entry 까지.
      *
      * 20140712
      -------------------------------------------------------------------*/
@@ -686,6 +688,7 @@ smp_on_up:
  *
  * 이작업을 왜할까 ?
  * http://www.phonesdevelopers.com/1813228/
+ * http://www.iamroot.org/xe/Kernel_10_ARM/180812#comment_181168
  -------------------------------------------------------------------*/
 __do_fixup_smp_on_up:
 	cmp	r4, r5
@@ -750,7 +753,7 @@ __fixup_pv_table:
     /*!!Q-----------------------------------------------------------------
      * r3 가 lsb 24 bit 를 clear 한 r6 값과 같으면 zero flag = 1
      * 한마디로 offset 이 16 MB aligned 인지를 검사.
-     * 근데 왜 하필 16 MB 일까 ? 궁금한데...
+     * 근데 왜 하필 16 MB 일까 ? -> Kconfig 의 ARM_PATCH_PHYS_VIRT 참고.
      -------------------------------------------------------------------*/
 	teq	r3, r6, lsl #24 @ must be 16MiB aligned
 THUMB(	it	ne		@ cross section branch )
@@ -809,6 +812,7 @@ __fixup_a_pv_table:
      * r3 = offset (16MB aligned)
      * r4 = physical __pv_table_begin
      * r5 = physical __pv_table_end
+     * r7 = PHYS_OFFSET
      -------------------------------------------------------------------*/
 	b	2f
 1:	ldr	ip, [r7, r3]
