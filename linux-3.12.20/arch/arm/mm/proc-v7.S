@@ -262,11 +262,20 @@ __v7_setup:
 
 	mrc	p15, 0, r0, c0, c0, 0		@ read main ID register
 	and	r10, r0, #0xff000000		@ ARM?
-	teq	r10, #0x41000000
+
+    /*!!C
+     * teq 는 같으면 zero flag = 1
+     */
+	teq	r10, #0x41000000    /!!C ARM Limited */
 	bne	3f
 	and	r5, r0, #0x00f00000		@ variant
 	and	r6, r0, #0x0000000f		@ revision
 	orr	r6, r6, r5, lsr #20-4		@ combine variant and revision
+
+    /*!!C
+     * r0 에서 4 - 12 bit 를 추출하여 target(r0)의
+     * 최하위쪽으로 넣어주는거네...
+     */
 	ubfx	r0, r0, #4, #12			@ primary part number
 
 	/* Cortex-A8 Errata */
@@ -331,6 +340,10 @@ __v7_setup:
 #endif
 
 	/* Cortex-A15 Errata */
+    /*!!C
+     * exynos5420 -> v7, a15 4 개, a7 4 개 
+     * 그래서, 우린 여길 봐야해...
+     */
 3:	ldr	r10, =0x00000c0f		@ Cortex-A15 primary part number
 	teq	r0, r10
 	bne	4f
@@ -346,6 +359,18 @@ __v7_setup:
 	mcr	p15, 0, r10, c7, c5, 0		@ I+BTB cache invalidate
 #ifdef CONFIG_MMU
 	mcr	p15, 0, r10, c8, c7, 0		@ invalidate I + D TLBs
+
+    /*!!C
+     * mm/proc-v7-2level.S
+     * 인자값
+     * r10 = 0
+     * r4 = page table pointer (ttbr0)
+     * r8 = page table pointer (ttbr1)
+     * r5 = temporary
+     *
+     * TTBCR -> 0 으로 설정.
+     * r8(ttbr1) -> TTB_FLAGS_SMP(?) 셋팅후에 coprocessor 로 로딩해줌.
+     */
 	v7_ttb_setup r10, r4, r8, r5		@ TTBCR, TTBRx setup
 	ldr	r5, =PRRR			@ PRRR
 	ldr	r6, =NMRR			@ NMRR
@@ -510,5 +535,10 @@ __krait_proc_info:
 __v7_proc_info:
 	.long	0x000f0000		@ Required ID value
 	.long	0x000f0000		@ Mask for ID
+
+    /*!!C
+     * offset 16 byte 자리가 __cpu_flush -> __v7_setup
+     * 우리는 __v7_setup 을 보면 된다.
+     */
 	__v7_proc __v7_setup
 	.size	__v7_proc_info, . - __v7_proc_info

@@ -135,6 +135,11 @@ ENDPROC(__v7m_setup)
 	/*
 	 * Match any ARMv7-M processor core.
 	 */
+/*!!Q
+ * 이러한 자료구조의 멤버들 값을 언제 누가 어디서 셋팅해주었을까?
+ * 유덕씨가 궁금하다...
+ * 나도... 전부다 ?
+ */
 	.type	__v7m_proc_info, #object
 __v7m_proc_info:
 	.long	0x000f0000		@ Required ID value

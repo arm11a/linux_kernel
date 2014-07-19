@@ -82,14 +82,32 @@ ENDPROC(v7_flush_icache_all)
  /*
  *     v7_flush_dcache_louis()
  *
- *     Flush the D-cache up to the Level of Unification Inner Shareable
+ *     Flush the D-cache up to the louis(Level of Unification Inner Shareable)
  *
  *     Corrupted registers: r0-r7, r9-r11 (r6 only in Thumb mode)
  */
 
+ /*!!C
+  * Level of Unification Inner Shareable ?
+  * -> CLIDR 레지스터의 21~23 bit 부분을 의미.
+  * -> v7 이전에는 louis 가 없어서 다른 core 가 cache 를 flush 하면
+  * 최하단까지 flush 했는데(자기랑 상관없는 것까지), v7 이후에 louis 를 통해
+  * 자신이 소유한(?) cache 만 flush.
+  */
 ENTRY(v7_flush_dcache_louis)
 	dmb					@ ensure ordering with previous memory accesses
 	mrc	p15, 1, r0, c0, c0, 1		@ read clidr, r0 = clidr
+
+    /*!!C
+     * pv_table 과 유사한 real time patch 를 수행하는 부분이다.
+     * 다음과 같이 smp/up 관련 patch 가 이루어진다.
+     * smp 용으로 빌드되었는데, 실행해보니 up 였더라...
+     *
+     * 1. 빌드과정에서 ALT_SMP, ALT_UP 매크로를 통해 smpalt table 을 만든다.
+     * 2. fixup_smp 에서 up 일 경우 9998 label 의 instruction 을 
+     *    up 용 명령어로 patch 한다.
+     * 3. 실행할 때는 up 용 patch 된 명령어가 수행된다.
+     */
 	ALT_SMP(ands	r3, r0, #(7 << 21))	@ extract LoUIS from clidr
 	ALT_UP(ands	r3, r0, #(7 << 27))	@ extract LoUU from clidr
 #ifdef CONFIG_ARM_ERRATA_643719

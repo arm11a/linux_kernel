@@ -1,4 +1,3 @@
-__pv_stub
 /*
  *  linux/arch/arm/kernel/head.S
  *
@@ -135,7 +134,7 @@ ENTRY(stext)
 
     /*!!C-----------------------------------------------------------------
      * physical RAM start address = PHYS_OFFSET
-     * = PAGE_OFFSET + offset(r4)
+     * = PAGE_OFFSET + delta offset(r4)
      -------------------------------------------------------------------*/
 	add	r8, r8, r4			@ PHYS_OFFSET, page_offset(0xc0000000)
 #else
@@ -167,10 +166,28 @@ ENTRY(stext)
 	 * above.  On return, the CPU will be ready for the MMU to be
 	 * turned on, and r0 will hold the CPU control register value.
 	 */
+    /*!!C
+     * r13 = functiona pointer of __mmap_switched(virtual)
+     *
+     * adr -> label(?) 의 physical address
+     * ldr -> 함수의 virtual address
+     */
 	ldr	r13, =__mmap_switched		@ address to jump to after
 						@ mmu has been enabled
+
+    /*!!C
+     * thumb2 가 아닐 때는 BSYM 은 그냥 1f 가 됨.
+     * lr 을 1f 로 설정함.
+     *
+     * PID(Position Independent Code)
+     */
 	adr	lr, BSYM(1f)			@ return (PIC) address
 	mov	r8, r4				@ set TTBR1 to swapper_pg_dir
+
+    /*!!C
+     * proc_info_list 의 __cpu_flush 가 가리키는 함수 수행.
+     * -> mm/proc-v7.S -> ? -> __v7_setup
+     */
  ARM(	add	pc, r10, #PROCINFO_INITFUNC	)
  THUMB(	add	r12, r10, #PROCINFO_INITFUNC	)
  THUMB(	mov	pc, r12				)
@@ -356,14 +373,41 @@ __create_page_tables:
 	/*
 	 * Then map boot params address in r2 if specified.
 	 * We map 2 sections in case the ATAGs/DTB crosses a section boundary.
+     * dtb 에 해당하는 entry 2 개 설정.
 	 */
+    /*!!C
+     * r2 = dtb pointer
+     * SECTION_SHIFT = 20 -> 1 MB
+     */
 	mov	r0, r2, lsr #SECTION_SHIFT
 	movs	r0, r0, lsl #SECTION_SHIFT
+
+    /*!!C
+     * 값자체가 0 인지를 검사
+     * r0 = virtual dtb pointer address
+     * r8 = physical offset
+     * r3(dtb phys pointer) = r0(v) + (r8(p) - Page offset(v))
+     * 
+     * zero flag = 0 일 경우 - dtb 나 atag 가 있을 경우 아래 수행 
+     */
 	subne	r3, r0, r8
 	addne	r3, r3, #PAGE_OFFSET
+
+    /*!!C
+     * dtb 에 해당하는 page table entry pointer 를 찾음.
+     * -> r3
+     */
 	addne	r3, r4, r3, lsr #(SECTION_SHIFT - PMD_ORDER)
+
+    /*!!C
+     * 첫번째 entry 값 셋팅 
+     */
 	orrne	r6, r7, r0
 	strne	r6, [r3], #1 << PMD_ORDER
+
+    /*!!C
+     * 다음 entry 값 셋팅 
+     */
 	addne	r6, r6, #1 << SECTION_SHIFT
 	strne	r6, [r3]
 
@@ -529,6 +573,9 @@ __enable_mmu:
 	bic	r0, r0, #CR_I
 #endif
 #ifndef CONFIG_ARM_LPAE
+    /*!!C
+     * Domain 에 대한 권한 관리 예습 필요.
+     */
 	mov	r5, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
 		      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
 		      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
@@ -655,7 +702,7 @@ __fixup_smp:
 __fixup_smp_on_up:
 	adr	r0, 1f
 	ldmia	r0, {r3 - r5}
-	sub	r3, r0, r3
+	sub	r3, r0, r3   /*!!C delta offset */
 	add	r4, r4, r3
 	add	r5, r5, r3
 	b	__do_fixup_smp_on_up
@@ -703,6 +750,7 @@ __do_fixup_smp_on_up:
 /*!!C-----------------------------------------------------------------
  * table 에서 첫번째와 두번째를 r0, r6 에 로드하여,
  * r0 의 physical 주소를 구해서 그 자리에 r6 값을 넣는다.
+ * r6 = instruction (?)
  -------------------------------------------------------------------*/
  ARM(	str	r6, [r0, r3]	)
  THUMB(	add	r0, r0, r3	)
@@ -731,7 +779,25 @@ ENDPROC(fixup_smp)
  * can be expressed by an immediate shifter operand. The stub instruction
  * has a form of '(add|sub) rd, rn, #imm'.
  */
-
+/*!!C-----------------------------------------------------------------
+ * virt_to_phys -> __virt_to_phys -> __pv_stub
+ *
+ * static inline unsigned long __virt_to_phys(unsigned long x)
+ * {
+ *     unsigned long t;
+ *     __pv_stub(x, t, "add", __PV_BITS_31_24);
+ *     return t;
+ * }
+ *
+ * #define __pv_stub(from,to,instr,type)			\
+ *  __asm__("@ __pv_stub\n"				\
+ *  "1:	" instr "	%0, %1, %2\n"		\
+ *  "	.pushsection .pv_table,\"a\"\n"		\  => 이전 section 을 section stack 에 push 하고 pv_table section 에 1b 주소를 저장 
+ *  "	.long	1b\n"				\          => pv_table 에 1b 의 physical 주소가 들어가게 됨.
+ *  "	.popsection\n"				\
+ *  : "=r" (to)					\       => output register
+ *  : "r" (from), "I" (type))           => input register & immediate value
+ -------------------------------------------------------------------*/
 /*!!C-----------------------------------------------------------------
  * http://lists.infradead.org/pipermail/linux-arm-kernel/2011-January/037089.html
  -------------------------------------------------------------------*/
@@ -746,7 +812,7 @@ __fixup_pv_table:
 	str	r8, [r7]	@ save computed PHYS_OFFSET to __pv_phys_offset
 
     /*!!C-----------------------------------------------------------------
-     * r3 는 offset 
+     * r3 는 delta 
      -------------------------------------------------------------------*/
 	mov	r6, r3, lsr #24	@ constant for add/sub instructions
 
@@ -758,13 +824,21 @@ __fixup_pv_table:
 	teq	r3, r6, lsl #24 @ must be 16MiB aligned
 THUMB(	it	ne		@ cross section branch )
     /*!!C-----------------------------------------------------------------
-     * offset 이 16 MB 단위가 아니면 에러.
+     * delta 가 16 MB 단위가 아니면 에러.
      -------------------------------------------------------------------*/
 	bne	__error
 
     /*!!C-----------------------------------------------------------------
-     * offset 을 16 MB 로 나눈 값. (16 MB 가 몇개인가)
-     * -> 이 값을 r7 + 4 자리에 저장해둠.
+     * delta >> 24 값(r6)을 r7 + 4(__pv_offset) 자리에 저장해둠.
+     * 이 영역은 data section 임.
+     * 그리고, 이 값은 delta offset 의 31-24 bit 의 값임.
+     * 이 값이 곧 pv_table 각 entry 의 끝 1 byte (immediate value)에 들어가는 값과 같음.
+     *
+     * c04d2944 <__pv_phys_offset>:
+     * c04d2944:   00000000    andeq   r0, r0, r0
+     *
+     * c04d2948 <__pv_offset>:
+     *  ...
      -------------------------------------------------------------------*/
 
     /*!!C-----------------------------------------------------------------
@@ -779,7 +853,7 @@ ENDPROC(__fixup_pv_table)
 
 	.align
 1:	.long	.
-	.long	__pv_table_begin
+	.long	__pv_table_begin   /*!!C __pv_table_begin label (data section)의 주소 값이 들어 있음 */
 	.long	__pv_table_end
 2:	.long	__pv_phys_offset
 
@@ -812,9 +886,15 @@ __fixup_a_pv_table:
      * r3 = offset (16MB aligned)
      * r4 = physical __pv_table_begin
      * r5 = physical __pv_table_end
-     * r7 = PHYS_OFFSET
+     * r7 = __pv_phys_offset
      -------------------------------------------------------------------*/
 	b	2f
+
+    /*!!C-----------------------------------------------------------------
+     * 결국 아래에서 하는 일은 pv_table 에 있는 값들을 가져와서 마지막 8 bit, 즉 
+     * immediate value 를 delta offset 의 31-24 값으로 대체하고 있다.
+     * 즉, 어떤 값이 들어있는지는 모르겠지만 끝의 1 byte 는 delta offset 의 31-24 값이다.
+     -------------------------------------------------------------------*/
 1:	ldr	ip, [r7, r3]
 	bic	ip, ip, #0x000000ff
 
@@ -825,13 +905,6 @@ __fixup_a_pv_table:
     /*!!Q-----------------------------------------------------------------
      * 결국 ip 의 하위 8 bit(immediate value) 를 r6 값으로 변경.
      * 그런 다음 table 의 원래 자리에 대체.
-     *
-     * -> pv table 이라는걸 좀더 알아봐야겠지만
-     * physical 주소와 virtual 주소의 변환에 사용되는 것이 맞다면
-     * 하위 1 byte 는 그 변환을 위해 사용되는 offset 성보를 
-     * 넣어두는 듯 하다.
-     *
-     * pv table 이 어떻게 쓰이는지가 궁금하다.
      -------------------------------------------------------------------*/
 	orr	ip, ip, r6	@ mask in offset bits 31-24
 	str	ip, [r7, r3]
