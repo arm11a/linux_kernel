@@ -471,6 +471,10 @@ static void __init mm_init(void)
 	vmalloc_init();
 }
 
+/*!!C-----------------------------------------------------------------
+ * http://studyfoss.egloos.com/4951809
+ * 20140726
+ -------------------------------------------------------------------*/
 asmlinkage void __init start_kernel(void)
 {
 	char * command_line;

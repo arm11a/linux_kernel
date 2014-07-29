@@ -41,6 +41,25 @@
 
 /* These are for everybody (although not all archs will actually
    discard it in modules) */
+
+/*!!C-----------------------------------------------------------------
+ * __init 으로 설정된 함수들은(보통 초기화 함수들) 특정한 섹션에 모아서 링크를 하고,
+ * 커널 부팅시에 초기화 함수들을 한번 수행한 후에는
+ * 그 영역은 자유 공간으로 할당하여서 사용하게 됩니다.
+ * (built-in 으로 컴파일 했을때만 이런 식으로 사용이 되고,
+ * module 로 컴파일 했을때는 별 다른 일을 하지 않습니다.)
+ * 간단히 얘기하면 부팅시에 한번만 사용되는 함수들이 사용하는 영역을
+ * 재사용하자는데 그 목적이 있습니다.
+ -------------------------------------------------------------------*/
+
+/*!!C-----------------------------------------------------------------
+ * __init 를 통해 start_kernel 함수에 3 가지의 속성을 지정하고 있다.
+ * 
+ * 1. __section : start_kernel 의 section 지정 
+ * 2. cold ??
+ * 3. notrace : profiling 막는다. -> 유덕씨가 start_kernel 에서 breakpoint 가 안걸린다더라.
+ *                                -> 그럼 notrace 빼고 해봐라.
+ -------------------------------------------------------------------*/
 #define __init		__section(.init.text) __cold notrace
 #define __initdata	__section(.init.data)
 #define __initconst	__constsection(.init.rodata)

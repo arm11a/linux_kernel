@@ -104,13 +104,36 @@ ENDPROC(__vet_atags)
  *  r9  = processor ID
  */
 	__INIT
+    /*!!C-----------------------------------------------------------------
+     * 여기부터는 가상주소이다.
+     * adr 로 가져온 label 값도 가상주소이다.
+     * 가상주소가 아니라면 아마도 delta offset 을 구했을 것이다.
+     -------------------------------------------------------------------*/
 __mmap_switched:
 	adr	r3, __mmap_switched_data
 
+    /*!!C-----------------------------------------------------------------
+     *  c04c8000 A __data_loc
+     *  c04c8000 D _data
+     *  c04c8000 D _sdata
+     *  c04c8000 D init_thread_union
+     *
+     * _sdata 가 아직 뭔지는 모르겠지만, 이 주소가 __data_loc 와 __bss_start 와
+     * 다르면 __data_loc 의 값들을 _sdata 로 copy 해준다.
+     * 어떨 때 _data 와 _sdata 가 다를까 ?
+     * 현재는 link script 에 . 으로 똑같이 설정되어 있는데, 이것을 다르게 설정해준다는
+     * 의미가 뭔지...
+     *
+     * link script 를 보면 CONFIG_XIP_KERNEL (ROM) 일 경우와 아닐 경우
+     * __data_loc 을 다르게 설정해주고 있다.
+     * RAM 일 경우에는 r4=r5 이므로 아래 copy 과정을 건너뜀.
+     *
+     * fp = frame pointer
+     -------------------------------------------------------------------*/
 	ldmia	r3!, {r4, r5, r6, r7}
 	cmp	r4, r5				@ Copy data segment if needed
-1:	cmpne	r5, r6
-	ldrne	fp, [r4], #4
+1:	cmpne	r5, r6          // if r4 != r5
+	ldrne	fp, [r4], #4    // if r5 != r6
 	strne	fp, [r5], #4
 	bne	1b
 
@@ -122,10 +145,30 @@ __mmap_switched:
  ARM(	ldmia	r3, {r4, r5, r6, r7, sp})
  THUMB(	ldmia	r3, {r4, r5, r6, r7}	)
  THUMB(	ldr	sp, [r3, #16]		)
+
+    /*!!C-----------------------------------------------------------------
+     * 아래 3 개를 data 영역에 쭈르륵 저장  
+	 * .long	processor_id			@ r4
+	 * .long	__machine_arch_type		@ r5
+	 * .long	__atags_pointer			@ r6
+     *
+	 * .long	cr_alignment			@ r7  ==> 0 
+	 * .long	init_thread_union + THREAD_START_SP @ sp
+     -------------------------------------------------------------------*/
 	str	r9, [r4]			@ Save processor ID
 	str	r1, [r5]			@ Save machine type
 	str	r2, [r6]			@ Save atags pointer
 	cmp	r7, #0
+
+    /*!!C-----------------------------------------------------------------
+     * align 은 여기서 신경안쓰겠다.
+     * 신경쓰면 아래 두 자리에 r0(ctrl register 원래값)와
+     * r4(ctrl register 를 A bit clear 한것) 를 저장.
+     *  cr_alignment:
+     *      .space	4
+     *  cr_no_alignment:
+     *      .space	4
+     -------------------------------------------------------------------*/
 	bicne	r4, r0, #CR_A			@ Clear 'A' bit
 	stmneia	r7, {r0, r4}			@ Save control register values
 	b	start_kernel

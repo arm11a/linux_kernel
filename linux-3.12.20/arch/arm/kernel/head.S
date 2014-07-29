@@ -166,28 +166,28 @@ ENTRY(stext)
 	 * above.  On return, the CPU will be ready for the MMU to be
 	 * turned on, and r0 will hold the CPU control register value.
 	 */
-    /*!!C
+    /*!!C-----------------------------------------------------------------
      * r13 = functiona pointer of __mmap_switched(virtual)
      *
      * adr -> label(?) 의 physical address
      * ldr -> 함수의 virtual address
-     */
+     -------------------------------------------------------------------*/
 	ldr	r13, =__mmap_switched		@ address to jump to after
 						@ mmu has been enabled
 
-    /*!!C
+    /*!!C-----------------------------------------------------------------
      * thumb2 가 아닐 때는 BSYM 은 그냥 1f 가 됨.
      * lr 을 1f 로 설정함.
      *
      * PID(Position Independent Code)
-     */
+     -------------------------------------------------------------------*/
 	adr	lr, BSYM(1f)			@ return (PIC) address
 	mov	r8, r4				@ set TTBR1 to swapper_pg_dir
 
-    /*!!C
+    /*!!C-----------------------------------------------------------------
      * proc_info_list 의 __cpu_flush 가 가리키는 함수 수행.
      * -> mm/proc-v7.S -> ? -> __v7_setup
-     */
+     -------------------------------------------------------------------*/
  ARM(	add	pc, r10, #PROCINFO_INITFUNC	)
  THUMB(	add	r12, r10, #PROCINFO_INITFUNC	)
  THUMB(	mov	pc, r12				)
@@ -375,39 +375,39 @@ __create_page_tables:
 	 * We map 2 sections in case the ATAGs/DTB crosses a section boundary.
      * dtb 에 해당하는 entry 2 개 설정.
 	 */
-    /*!!C
+    /*!!C-----------------------------------------------------------------
      * r2 = dtb pointer
      * SECTION_SHIFT = 20 -> 1 MB
-     */
+     -------------------------------------------------------------------*/
 	mov	r0, r2, lsr #SECTION_SHIFT
 	movs	r0, r0, lsl #SECTION_SHIFT
 
-    /*!!C
+    /*!!C-----------------------------------------------------------------
      * 값자체가 0 인지를 검사
      * r0 = virtual dtb pointer address
      * r8 = physical offset
      * r3(dtb phys pointer) = r0(v) + (r8(p) - Page offset(v))
      * 
      * zero flag = 0 일 경우 - dtb 나 atag 가 있을 경우 아래 수행 
-     */
+     -------------------------------------------------------------------*/
 	subne	r3, r0, r8
 	addne	r3, r3, #PAGE_OFFSET
 
-    /*!!C
+    /*!!C-----------------------------------------------------------------
      * dtb 에 해당하는 page table entry pointer 를 찾음.
      * -> r3
-     */
+     -------------------------------------------------------------------*/
 	addne	r3, r4, r3, lsr #(SECTION_SHIFT - PMD_ORDER)
 
-    /*!!C
+    /*!!C-----------------------------------------------------------------
      * 첫번째 entry 값 셋팅 
-     */
+     -------------------------------------------------------------------*/
 	orrne	r6, r7, r0
 	strne	r6, [r3], #1 << PMD_ORDER
 
-    /*!!C
+    /*!!C-----------------------------------------------------------------
      * 다음 entry 값 셋팅 
-     */
+     -------------------------------------------------------------------*/
 	addne	r6, r6, #1 << SECTION_SHIFT
 	strne	r6, [r3]
 
@@ -573,9 +573,32 @@ __enable_mmu:
 	bic	r0, r0, #CR_I
 #endif
 #ifndef CONFIG_ARM_LPAE
-    /*!!C
+    /*!!C-----------------------------------------------------------------
      * Domain 에 대한 권한 관리 예습 필요.
-     */
+     * 20140719
+     *
+     *  #define DOMAIN_KERNEL	2
+     *  #define DOMAIN_TABLE	2
+     *  #define DOMAIN_USER	1
+     *  #define DOMAIN_IO	0
+     *
+     * armv7 이후로 domains 를 사용하지 않고 pte 의 ap field 를
+     * 이용한다. -> LPAE
+     *
+     * ARM 문서 B.3.7.3
+     * The Long-descriptor translation table format does not support domains.
+     * When a stage of translation is using this format,
+     * all memory is treated as being in a Client domain,
+     * and the settings in the DACR are ignored.
+     *
+     * 이건 ARM 에서 권장(?)인지는 모르지만 linux 에서 꼭 이렇게 사용할 필요는 없는 듯 ?
+     * 아래에서도 CONFIG_CPU_USE_DOMAINS 가 설정안되어 있을 경우 그냥 모두
+     * client 로 설정하고 있다.
+     *
+     * 1 << (2*1) | 1 << (2*2) | 1 << (2*2) | 1 << (2*0)
+     *  0100          1 0000        1 0000      0001
+     *  => 01 01 01
+     -------------------------------------------------------------------*/
 	mov	r5, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
 		      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
 		      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
@@ -606,9 +629,20 @@ ENTRY(__turn_mmu_on)
 	mov	r0, r0
 	instr_sync
 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
+    /*!!Q
+     * 이 짓거리를 왜하지 ?
+     */
 	mrc	p15, 0, r3, c0, c0, 0		@ read id reg
 	instr_sync
+
+    /*!!Q
+     * mov r3,r3 를 왜하지 ? -> nop ?
+     */
 	mov	r3, r3
+
+    /*!!Q
+     * 이건 또 왜 두번에 걸쳐서 ?
+     */
 	mov	r3, r13
 	mov	pc, r3
 __turn_mmu_on_end:
@@ -832,7 +866,8 @@ THUMB(	it	ne		@ cross section branch )
      * delta >> 24 값(r6)을 r7 + 4(__pv_offset) 자리에 저장해둠.
      * 이 영역은 data section 임.
      * 그리고, 이 값은 delta offset 의 31-24 bit 의 값임.
-     * 이 값이 곧 pv_table 각 entry 의 끝 1 byte (immediate value)에 들어가는 값과 같음.
+     * 이 값이 곧 pv_table 각 entry 가 가리키는 원래 명령어(__pv_stub에서 만들어진)의 
+     * 끝 1 byte (immediate value)에 들어가는 값과 같음.
      *
      * c04d2944 <__pv_phys_offset>:
      * c04d2944:   00000000    andeq   r0, r0, r0
