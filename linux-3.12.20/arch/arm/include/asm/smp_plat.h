@@ -19,6 +19,10 @@ static inline bool is_smp(void)
 	return false;
 #elif defined(CONFIG_SMP_ON_UP)
 	extern unsigned int smp_on_up;
+    /*!!C
+     * smp_on_up 값이 1 보다 크더라도 결국은 1 이 된다.
+     * 그래서, return 형이 bool 이다.
+     */
 	return !!smp_on_up;
 #else
 	return true;

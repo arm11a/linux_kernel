@@ -78,6 +78,14 @@
 
 extern unsigned int processor_id;
 
+/*!!Q
+ * __stringify(reg)는 reg 의 string 
+ *
+ * 아래에서 cc 는 왜 사용했을까 ?
+ * cc = condition code
+ * mrc 의 결과로 cpsr register 의 zero flag,... 값이 변경될 수 있다는
+ * 것을 알려주는 역할.
+ */
 #ifdef CONFIG_CPU_CP15
 #define read_cpuid(reg)							\
 	({								\
@@ -188,6 +196,12 @@ static inline unsigned int __attribute_const__ read_cpuid_tcmstatus(void)
 	return read_cpuid(CPUID_TCM);
 }
 
+/*!!C
+ * __attribute_const__ 는 아래와 같다. 
+ * __attribute__(__const__)
+ *
+ * __attribute_const__ 는 함수의 인자와 리턴값이 const value 여야한다는 것.
+ */
 static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
 {
 	return read_cpuid(CPUID_MPIDR);

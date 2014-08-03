@@ -463,23 +463,69 @@ void notrace cpu_init(void)
 #endif
 }
 
+/*!!Q
+ * 왜 누구는 CONFIG_NR_CPUS 값이 1 이고, 어떤 사람은 2 일까 ?
+ * 어쨌건 명확한 것은 Target Board 의 코어 수라는거...
+ */
 u32 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = MPIDR_INVALID };
 
 void __init smp_setup_processor_id(void)
 {
 	int i;
+
+    /*!!C
+     * smp 이면 MPIDR register 값에서 끝의 3 byte 획득.
+     */
 	u32 mpidr = is_smp() ? read_cpuid_mpidr() & MPIDR_HWID_BITMASK : 0;
+
+    /*!!C
+     * (mpidr >> (8 * 0) & ((1 << 8) - 1)
+     *  = (mpidr >> 0) & (0x100 - 1)
+     *  = mpidr & 0xFF
+     *
+     * Level 0 Affinity 를 구함. 
+     */
 	u32 cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
 
 	cpu_logical_map(0) = cpu;
+
+    /*!!C
+     * nr_cpu_ids = 2
+     * build 한 사람은 2이고, 아닌 사람은 1 이다.
+     *
+     * nr_cpu 가 4 개라고 생각해보자.
+     *
+     * Affinity 가 가장높은 cpu 를 array 0 에 설정 
+     * cpu 값이 3 이라고 하면 array 3 에는 0 이 설정됨.
+     *
+     * [0] = cpu  => Affinity 가 가장높은 cpu 를 설정 
+     * [1] = (1 == cpu) => 0 else 1
+     * [2] = (2 == cpu) => 0 else 2
+     * [3] = (3 == cpu) => 0 else 3
+     *
+     * MPIDR register 의 값은 제조사에서 이미 정해놓은 값으로
+     * 사용하는 것 같다. 우리가 설정한 적이 없음.
+     */
 	for (i = 1; i < nr_cpu_ids; ++i)
-		cpu_logical_map(i) = i == cpu ? 0 : i;
+		cpu_logical_map(i) = (i == cpu ? 0 : i);
 
 	/*
 	 * clear __my_cpu_offset on boot CPU to avoid hang caused by
 	 * using percpu variable early, for example, lockdep will
 	 * access percpu variable inside lock_release
 	 */
+
+    /*!!Q
+     * TODO
+     *
+     * The TPIDRPRW provides a location where software executing at PL1 or
+     * higher can store thread identifying information
+     * that is not visible to software executing at PL0, for OS management purposes
+     *
+     * 아래 set_my_cpu_offset 을 하는 이유 ?
+     *   1. TPIDRPRW 를 단순히 초기화 ?
+     *   2. 위에서 cpu 를 설정해둔 map 의 index 0 값을 TPIDRPRW 에 설정 ?
+     */
 	set_my_cpu_offset(0);
 
 	printk(KERN_INFO "Booting Linux on physical CPU 0x%x\n", mpidr);

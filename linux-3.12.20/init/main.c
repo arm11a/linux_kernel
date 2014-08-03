@@ -471,6 +471,13 @@ static void __init mm_init(void)
 	vmalloc_init();
 }
 
+
+/*!!C-----------------------------------------------------------------
+ * .long    processor_id            @ r4
+ * .long    __machine_arch_type     @ r5
+ * .long    __atags_pointer         @ r6
+ -------------------------------------------------------------------*/
+
 /*!!C-----------------------------------------------------------------
  * http://studyfoss.egloos.com/4951809
  * 20140726
@@ -484,7 +491,12 @@ asmlinkage void __init start_kernel(void)
 	 * Need to run as early as possible, to initialize the
 	 * lockdep hash:
 	 */
+    /*!!C
+     * CONFIG_LOCKDEP 설정이 안되어 있으므로 아무것도 안함. 
+     * Debug 에서만 사용하고 Lock 간의 의존성 검사를 위해 사용한다고 함.
+     */
 	lockdep_init();
+
 	smp_setup_processor_id();
 	debug_objects_early_init();
 

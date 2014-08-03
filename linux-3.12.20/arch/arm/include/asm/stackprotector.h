@@ -23,6 +23,9 @@ extern unsigned long __stack_chk_guard;
  * NOTE: this must only be called from functions that never return,
  * and it must always be inlined.
  */
+/*!!C
+ * optimization level 이 지정되지 않았어도 inline 화 시킨다.
+ */
 static __always_inline void boot_init_stack_canary(void)
 {
 	unsigned long canary;
