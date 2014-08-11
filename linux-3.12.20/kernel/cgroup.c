@@ -5065,6 +5065,10 @@ EXPORT_SYMBOL_GPL(cgroup_unload_subsys);
  * Initialize cgroups at system boot, and initialize any
  * subsystems that request early init.
  */
+/*!!C
+ * 자료구조 연결관계 참조
+ * http://blog.chinaunix.net/uid-23253303-id-4005220.html
+ */
 int __init cgroup_init_early(void)
 {
 	struct cgroup_subsys *ss;

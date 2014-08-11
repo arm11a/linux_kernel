@@ -965,6 +965,9 @@ static ssize_t extract_entropy(struct entropy_store *r, void *buf,
 	unsigned long flags;
 
 	/* if last_data isn't primed, we need EXTRACT_SIZE extra bytes */
+    /*!!C
+     * fips(Federal Information Processing Standard)
+     */
 	if (fips_enabled) {
 		spin_lock_irqsave(&r->lock, flags);
 		if (!r->last_data_init) {
@@ -1053,6 +1056,9 @@ static ssize_t extract_entropy_user(struct entropy_store *r, void __user *buf,
  */
 void get_random_bytes(void *buf, int nbytes)
 {
+    /*!!C
+     * entropy = randomness
+     */
 	extract_entropy(&nonblocking_pool, buf, nbytes, 0, 0);
 }
 EXPORT_SYMBOL(get_random_bytes);

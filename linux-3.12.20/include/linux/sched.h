@@ -1920,6 +1920,10 @@ void yield(void);
  */
 extern struct exec_domain	default_exec_domain;
 
+/*!!C
+ * thread_union 에 대해 THREAD_SIZE 만큼 크기를 잡고
+ * 앞에 thread_info 을 두고 그 뒤는 나머지 stack 으로 사용할 수 있다. 
+ */
 union thread_union {
 	struct thread_info thread_info;
 	unsigned long stack[THREAD_SIZE/sizeof(long)];

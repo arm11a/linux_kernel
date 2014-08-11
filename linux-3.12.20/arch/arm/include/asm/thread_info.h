@@ -104,9 +104,19 @@ struct thread_info {
  */
 static inline struct thread_info *current_thread_info(void) __attribute_const__;
 
+/*!!Q
+ * 왜 아래와 같이 sp 를 통해서 current thread info 를 가져올까 ?
+ */
 static inline struct thread_info *current_thread_info(void)
 {
 	register unsigned long sp asm ("sp");
+
+    /*!!C
+     * 하위 13 bit 를 잘라낸 것의 의미 ?
+     * thread 마다 stack 영역은 따로 사용되고, 아래 13 bit 를 
+     * 잘라내면 자신이 사용하는 stack 의 start 지점인가 ?
+     * 그 첫번째 위치에 thread_info 가 들어가지 않을까 ?
+     */
 	return (struct thread_info *)(sp & ~(THREAD_SIZE - 1));
 }
 

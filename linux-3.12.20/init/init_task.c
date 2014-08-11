@@ -22,5 +22,10 @@ EXPORT_SYMBOL(init_task);
  * Initial thread structure. Alignment of this is handled by a special
  * linker map entry.
  */
+/*!!C
+ * 위에서 task_struct 를 초기화하고 이를 이용해서 thread_info 를
+ * 이용하여 초기화 
+ * link script 에 data.init_task 가 8K align 으로 선언되어 있음.
+ */
 union thread_union init_thread_union __init_task_data =
 	{ INIT_THREAD_INFO(init_task) };

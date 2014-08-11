@@ -34,7 +34,16 @@ static __always_inline void boot_init_stack_canary(void)
 	get_random_bytes(&canary, sizeof(canary));
 	canary ^= LINUX_VERSION_CODE;
 
+    /*!!C
+     * 초기화한 thread_info 에서 task_struct 를 가져와서
+     * 그 안의 canary 변수를 설정한다.
+     */
 	current->stack_canary = canary;
+
+    /*!!C
+     * __stack_chk_guard 변수는 global 이라서 ARM 에서
+     * 다수의 thread 가 공통으로 사용한다. 
+     */
 	__stack_chk_guard = current->stack_canary;
 }
 

@@ -5,6 +5,10 @@
  * Check at compile time that something is of a particular type.
  * Always evaluates to 1 so you may use it easily in comparisons.
  */
+/*!!C
+ * typeof
+ * http://stackoverflow.com/questions/12081502/typeof-operator-in-c
+ */
 #define typecheck(type,x) \
 ({	type __dummy; \
 	typeof(x) __dummy2; \

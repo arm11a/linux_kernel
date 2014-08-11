@@ -153,7 +153,7 @@ __mmap_switched:
 	 * .long	__atags_pointer			@ r6
      *
 	 * .long	cr_alignment			@ r7  ==> 0 
-	 * .long	init_thread_union + THREAD_START_SP @ sp
+	 * .long	init_thread_union + THREAD_START_SP @ sp -> thread_info 가 맨위.
      -------------------------------------------------------------------*/
 	str	r9, [r4]			@ Save processor ID
 	str	r1, [r5]			@ Save machine type
