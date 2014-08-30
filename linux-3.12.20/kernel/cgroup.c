@@ -5081,6 +5081,10 @@ int __init cgroup_init_early(void)
 	css_set_count = 1;
 	init_cgroup_root(&cgroup_dummy_root);
 	cgroup_root_count = 1;
+
+    /*!!Q
+     * rcu ? __rcu ?
+     */
 	RCU_INIT_POINTER(init_task.cgroups, &init_css_set);
 
 	init_cgrp_cset_link.cset = &init_css_set;

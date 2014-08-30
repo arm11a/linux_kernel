@@ -54,6 +54,16 @@
 #define smp_rmb()	barrier()
 #define smp_wmb()	barrier()
 #else
+/*!!C
+ * memory barrier & volatile
+ *
+ * http://ko.wikipedia.org/wiki/%EB%A9%94%EB%AA%A8%EB%A6%AC_%EB%B0%B0%EB%A6%AC%EC%96%B4
+ * http://summerlight-textcube.blogspot.kr/2009/11/volatile%EA%B3%BC-%EB%A9%94%EB%AA%A8%EB%A6%AC-%EB%B0%B0%EB%A6%AC%EC%96%B4.html
+ *
+ * dmb 관련 좋은 링크
+ * http://community.arm.com/groups/processors/blog/2011/10/19/memory-access-ordering-part-3--memory-access-ordering-in-the-arm-architecture
+ */
+ mb
 #define smp_mb()	dmb(ish)
 #define smp_rmb()	smp_mb()
 #define smp_wmb()	dmb(ishst)

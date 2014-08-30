@@ -26,6 +26,14 @@
  * strex/ldrex monitor on some implementations. The reason we can use it for
  * atomic_set() is the clrex or dummy strex done on every exception return.
  */
+/*!!C
+ * http://lists.infradead.org/pipermail/linux-arm-kernel/2009-September/000665.html
+ *
+ * With this patch, the atomic_set() operation can be a simple STR
+ * instruction (on SMP systems, the global exclusive monitor is cleared by
+ * STR anyway). Clearing the exclusive monitor during context switch is no
+ * longer needed as this is handled by the exception return path anyway.
+ */
 #define atomic_read(v)	(*(volatile int *)&(v)->counter)
 #define atomic_set(v,i)	(((v)->counter) = (i))
 
@@ -52,11 +60,35 @@ static inline void atomic_add(int i, atomic_t *v)
 	: "cc");
 }
 
+/*!!C
+ * strex 할 때 tag 가 변경되어 있으면 tmp 가 0 이 아닌 값으로
+ * 설정되어 있어서 looping 수행 
+ *
+ * 1 : ldrex result, [&v->counter]
+ *     add result, result, i
+ *     strex tmp, result, [&v->counter]
+ *     teq tmp, #0      @ if tmp == 0, go, else go back
+ *     bne 1b
+ *
+ * +Qo 에서 o 는 offset 을 말함.
+ * http://en.it-usenet.org/thread/18514/26572/  에서 맨아래 예제 참조 
+ */
+/*!!Q
+ * Qo 는 뭐지 ? -> 후기 
+ */
+
 static inline int atomic_add_return(int i, atomic_t *v)
 {
 	unsigned long tmp;
 	int result;
 
+    /*!!C
+     * 지금까지의 메모리 변경을 inner shareable 범위내에서
+     * 다른 놈들에게 visible 하도록 dmb ish 를 수행.
+     *
+     * result 라는 변수영역(캐쉬 or 메모리)을 visible 하게 하려면
+     * register 의 값을 result 변수영역으로 flush 해주어야 함.
+     */
 	smp_mb();
 
 	__asm__ __volatile__("@ atomic_add_return\n"
