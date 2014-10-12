@@ -120,7 +120,14 @@
 #define irqs_disabled()					\
 	({						\
 		unsigned long _flags;			\
+        /*!!C
+         * _flags <= cpsr register
+         */
 		raw_local_save_flags(_flags);		\
+
+        /*!!C
+         * check if irq bit is set
+         */
 		raw_irqs_disabled_flags(_flags);	\
 	})
 

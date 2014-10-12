@@ -42,6 +42,9 @@ static inline void arch_local_irq_enable(void)
 
 static inline void arch_local_irq_disable(void)
 {
+    /*!!C
+     * cps = Change Processor State
+     */
 	asm volatile(
 		"	cpsid i			@ arch_local_irq_disable"
 		:

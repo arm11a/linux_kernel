@@ -254,6 +254,9 @@ int cpumask_any_but(const struct cpumask *mask, unsigned int cpu);
  */
 static inline void cpumask_set_cpu(unsigned int cpu, struct cpumask *dstp)
 {
+    /*!!C
+     * cpu 를 dstp(cpumast struct)->bits 에다가 셋팅.
+     */
 	set_bit(cpumask_check(cpu), cpumask_bits(dstp));
 }
 
@@ -401,9 +404,18 @@ static inline void cpumask_complement(struct cpumask *dstp,
  * @src1p: the first input
  * @src2p: the second input
  */
+
+/*!!C
+ * cpumask_t -> DECLARE_BITMAP 을 보면...
+* 결국 src1p->bits 에 long 형변수 array 형태로 bitmap 이 정의되어 있다.
+*/
 static inline bool cpumask_equal(const struct cpumask *src1p,
 				const struct cpumask *src2p)
 {
+    /*!!C
+     * src1p 와 src2p 의 bitmap 을 nr_cpumask_bits bit 만큼
+     * 비교하여 같은지...
+     */
 	return bitmap_equal(cpumask_bits(src1p), cpumask_bits(src2p),
 						 nr_cpumask_bits);
 }

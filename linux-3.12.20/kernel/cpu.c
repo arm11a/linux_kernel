@@ -696,6 +696,9 @@ void set_cpu_present(unsigned int cpu, bool present)
 void set_cpu_online(unsigned int cpu, bool online)
 {
 	if (online)
+        /*!!C
+         * cpu 를 cpu_online_bits bitmap 에 설정 
+         */
 		cpumask_set_cpu(cpu, to_cpumask(cpu_online_bits));
 	else
 		cpumask_clear_cpu(cpu, to_cpumask(cpu_online_bits));

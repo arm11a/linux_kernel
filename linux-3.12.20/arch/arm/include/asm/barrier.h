@@ -63,7 +63,6 @@
  * dmb 관련 좋은 링크
  * http://community.arm.com/groups/processors/blog/2011/10/19/memory-access-ordering-part-3--memory-access-ordering-in-the-arm-architecture
  */
- mb
 #define smp_mb()	dmb(ish)
 #define smp_rmb()	smp_mb()
 #define smp_wmb()	dmb(ishst)

@@ -438,6 +438,11 @@ static void __init boot_cpu_init(void)
 {
 	int cpu = smp_processor_id();
 	/* Mark the boot cpu "present", "online" etc for SMP and UP case */
+
+    /*!!C
+     * static bitmap 변수에 cpu 를 임시로 설정을 해둠.
+     * 단지, 어떤 static 변수는 이후에 사용하는데가 없는 듯...
+     */
 	set_cpu_online(cpu, true);
 	set_cpu_active(cpu, true);
 	set_cpu_present(cpu, true);
@@ -517,6 +522,10 @@ asmlinkage void __init start_kernel(void)
 	boot_cpu_init();
 	page_address_init();
 	pr_notice("%s", linux_banner);
+    /*!!C
+     * 20141011
+     */
+
 	setup_arch(&command_line);
 	mm_init_owner(&init_mm, &init_task);
 	mm_init_cpumask(&init_mm);
