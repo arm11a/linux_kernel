@@ -306,6 +306,10 @@ static void __init cacheid_init(void)
 	if (arch == CPU_ARCH_ARMv7M) {
 		cacheid = 0;
 	} else if (arch >= CPU_ARCH_ARMv6) {
+		/*!!C 
+		 * Page Colouring에 대한 내용, 캐쉬의 Virtual, physical indexing에 대한 내용
+		 * http://community.arm.com/groups/processors/blog/2012/05/14/page-colouring-on-armv6-and-a-bit-on-armv7#MMAP
+		 */
 		unsigned int cachetype = read_cpuid_cachetype();
 		if ((cachetype & (7 << 29)) == 4 << 29) {
 			/* ARMv7 register format */
@@ -374,6 +378,14 @@ static void __init cpuid_init_hwcaps(void)
 
 	divide_instrs = (read_cpuid_ext(CPUID_EXT_ISAR0) & 0x0f000000) >> 24;
 
+	/*!!C
+	 * SDIV : Signed Divide
+	 * UDIV : Unsigned Divide
+	 * 아래 elf_hwcap 플래그 변수에 IDIVA, IDIVT 비트를 세팅
+	 * IDIV : Inst DIVide
+	 * T : Thumb
+	 * A : Arm
+	 */
 	switch (divide_instrs) {
 	case 2:
 		elf_hwcap |= HWCAP_IDIVA;
@@ -383,14 +395,36 @@ static void __init cpuid_init_hwcaps(void)
 
 	/* LPAE implies atomic ldrd/strd instructions */
 	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
+	/*!!C
+	 * vmsa변수는 아래 VMSA support 부분을 의미한다.
+	 * VMSA support, bits[3:0]
+	 * 그 값이 0b0011로 설정되어 있음을 ARM-Manual문서를 통해 확인할 수 있다.
+	 * 0b0011 : Support for VMSAv7, with support for remapping and the Access flag. ARMv7-A
+	 * profile.
+	 */
 	if (vmsa >= 5)
 		elf_hwcap |= HWCAP_LPAE;
+	/*!!Q
+	 * elf는 무엇일까요?
+	 */
+	/*!!C
+	 * 2014.10.18
+	 */
 }
 
 static void __init feat_v6_fixup(void)
 {
+	/*!!C
+	 *id는 MIDR 통째로
+	 * */
 	int id = read_cpuid_id();
 
+	/*!!C
+	 * 0x41 ARM Limited
+	 * +
+	 * 0x7 ARMv6
+	 * = 0x41070000
+	 */
 	if ((id & 0xff0f0000) != 0x41070000)
 		return;
 
@@ -400,12 +434,23 @@ static void __init feat_v6_fixup(void)
 	 */
 	if ((((id >> 4) & 0xfff) == 0xb36) && (((id >> 20) & 3) == 0))
 		elf_hwcap &= ~HWCAP_TLS;
+	/*!!C
+	 * TLS = Thread Local Storage
+	 * Context Switch를 할때, tls를 소프트웨어적으로 할것인지 하드웨어적으로 지원해줄 것인지에 대한 플래그를 설정한다.
+	 * 위의 if문에서는 arm1136보드에서는 하드웨어적으로 지원하지 않는다는것을 알 수 있다.
+	 */
 }
 
 /*
  * cpu_init - initialise one CPU.
  *
  * cpu_init sets up the per-CPU stacks.
+ */
+
+/*!!C
+ * notrace attribute 매크로
+ * http://ospace.tistory.com/86
+ * no_instrument_function은 함수 애트리뷰트는 프로파일링 함수에 제공되어 프로파일링 함수가 루프가 되지 않도록하여 필요없는 추가 데이터를 생기지 않도록 한다.
  */
 void notrace cpu_init(void)
 {
@@ -424,6 +469,11 @@ void notrace cpu_init(void)
 	 */
 	set_my_cpu_offset(per_cpu_offset(cpu));
 
+	/*!!C
+	 * cpu_proc_init()은 결국 
+	 * arch/arm/mm/proc-v7.S에 있는 cpu_v7_proc_init을 호출함
+	 * 2014.10.25
+	 */
 	cpu_proc_init();
 
 	/*
@@ -616,9 +666,26 @@ static void __init setup_processor(void)
 	cpu_name = list->cpu_name;
 	__cpu_architecture = __get_cpu_architecture();
 
+	/*!!Q
+	 * 1. MULTI_CPU는 어디에 설정되어 있는가?
+	 * 설정 안되어 있는건가?
+	 * ->설정이 안되어 있는 것으로
+	 * 2. 여기서 말하는 MULTI의 의미가 CPU가 여러개 있는 것을 의미하는건지?
+	 */
+
 #ifdef MULTI_CPU
 	processor = *list->proc;
 #endif
+	/*!!C
+	 * MULTI_TLB, MULTI_USER는 설정되어 있음
+	 * MULTI_CPU, MULTI_CACHE는 설정되어 있지 않음
+	 *
+	 * __v7_ca15mp_proc_info는 arch/arm/mm/proc-v7.S에 선언되어 있고,
+	 * 그 안에 __v7_proc __v7_ca15mp_setup를 살펴보면 tlb, user, cpu등의 정보가 들어있다.
+	 *
+	 * 우리는 list변수가 __v7_ca15mp_proc_info를 가르키고 있으므로,
+	 * 그에 해당 하는 user정보와 cahe정보를 각각 cpu_user와 cpu_cahe로 저장한다.
+	 */
 #ifdef MULTI_TLB
 	cpu_tlb = *list->tlb;
 #endif
@@ -633,11 +700,27 @@ static void __init setup_processor(void)
 	       cpu_name, read_cpuid_id(), read_cpuid_id() & 15,
 	       proc_arch[cpu_architecture()], cr_alignment);
 
+	/*!!C
+	 * 아래 snprintf에서 UTS관련 스트링들을 설정해줌
+	 * 이 스트링들은 uname명령어에서 사용됨 아래 링크에 근거함.
+	 * Universal Timesharing System = UTS
+	 *
+	 * http://publib.boulder.ibm.com/infocenter/zvm/v6r1/index.jsp?topic=/com.ibm.zvm.v610.edclv/rtuna.htm
+	 */
+
+	/*!!C
+	 * ENDIANNESS매크로로 endian 테스트 하는 테크닉
+	 */
 	snprintf(init_utsname()->machine, __NEW_UTS_LEN + 1, "%s%c",
 		 list->arch_name, ENDIANNESS);
 	snprintf(elf_platform, ELF_PLATFORM_SIZE, "%s%c",
 		 list->elf_name, ENDIANNESS);
 	elf_hwcap = list->elf_hwcap;
+
+	/*!!C
+	 * elf_hwcap는 하드웨어 지원사양을 알려주는 flag
+	 * 10차 ob내용 참고
+	 * */
 
 	cpuid_init_hwcaps();
 
@@ -647,6 +730,10 @@ static void __init setup_processor(void)
 
 	feat_v6_fixup();
 
+	/*!!C
+	 *cahe와 virtual address, physical address 관련 정책은 다시한번
+	 *특집으로 공부
+	 */
 	cacheid_init();
 	cpu_init();
 }

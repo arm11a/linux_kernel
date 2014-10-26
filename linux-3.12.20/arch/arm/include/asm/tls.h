@@ -1,6 +1,11 @@
 #ifndef __ASMARM_TLS_H
 #define __ASMARM_TLS_H
 
+/*!!C
+ * TLS = Thread Local Storage
+ * Context Switch를 할때, tls를 소프트웨어적으로 지원하는지에 대한 내용
+ * switch_tls 매크로를 __switch_to 함수에서 호출하여 나중에 사용
+ */
 #ifdef __ASSEMBLY__
 #include <asm/asm-offsets.h>
 	.macro switch_tls_none, base, tp, tpuser, tmp1, tmp2
@@ -12,7 +17,7 @@
 	mcr	p15, 0, \tpuser, c13, c0, 2	@ and the user r/w register
 	str	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
 	.endm
-
+ 
 	.macro switch_tls_v6, base, tp, tpuser, tmp1, tmp2
 	ldr	\tmp1, =elf_hwcap
 	ldr	\tmp1, [\tmp1, #0]

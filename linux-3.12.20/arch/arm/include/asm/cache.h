@@ -23,6 +23,14 @@
 #define ARCH_SLAB_MINALIGN 8
 #endif
 
+/*!!C
+ *__read_mostly 매크로에 대한 설명
+ http://blog.daum.net/birdkiller/326
+ * 
+ * Cache Line bouncing에 대한 설명
+ * http://barriosstory.blogspot.kr/2008/03/cache.html
+ * 
+ * */
 #define __read_mostly __attribute__((__section__(".data..read_mostly")))
 
 #endif

@@ -88,6 +88,12 @@
  * would be.
  * [...]
  */
+
+/*!!C
+ * pure attribute 설명 링크
+ * http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0348bk/BABGFEBH.html
+ * http://www.iamroot.org/xe/index.php?mid=Hypervisor_1_Xen&page=3&document_srl=7536
+ */
 #define __pure				__attribute__((pure))
 #define __aligned(x)			__attribute__((aligned(x)))
 #define __printf(a, b)			__attribute__((format(printf, a, b)))
