@@ -277,6 +277,13 @@ static int cpu_has_aliasing_icache(unsigned int arch)
 
 	/* arch specifies the register format */
 	switch (arch) {
+		/*!!C CSSELR = Cache Size Selection Register 
+		 * CSSELR 3:1 bit = Cache Level 설정
+		 * CSSELR 0 bit = InD 설정(Instruction or Data Cache)
+		 * CSSELR 을 설정하면 CCSIDR 의 값이 바뀐다. 이 정보를 읽어서 architecture 의 캐시정보를 알아낼 수 있다.
+		 * 여기에서는 Level 0의 Instruction Cache 의 정보를 읽어오는 것으로 설정한다.
+		 * CSSELR 을 셋팅한 후 isb() 를 하는 이유는 mcr 명령이 완료된 이후 CCSIDR 의 값을 읽어오기 위함이다.
+		 */
 	case CPU_ARCH_ARMv7:
 		asm("mcr	p15, 2, %0, c0, c0, 0 @ set CSSELR"
 		    : /* No output operands */
@@ -284,9 +291,17 @@ static int cpu_has_aliasing_icache(unsigned int arch)
 		isb();
 		asm("mrc	p15, 1, %0, c0, c0, 0 @ read CCSIDR"
 		    : "=r" (id_reg));
-		line_size = 4 << ((id_reg & 0x7) + 2);
-		num_sets = ((id_reg >> 13) & 0x7fff) + 1;
-		aliasing_icache = (line_size * num_sets) > PAGE_SIZE;
+		line_size = 4 << ((id_reg & 0x7) + 2);    /*!!C (Log2(Number of words in cache line))–2 으로 Register
+							    에 적혀있다. LineSize  값이 0이면 4워드 를 1캐시라인으로
+							    사용한다. Line_size 는 캐시라인의 사이즈를 의미.
+							    */
+		num_sets = ((id_reg >> 13) & 0x7fff) + 1; /*!!C NumSets 값은 실제 (set 갯수 -1) 한 갯수가 Register에
+							    적혀있다. NumSets은 Line Index의 총갯수와 같다.
+							   */ 
+		aliasing_icache = (line_size * num_sets) > PAGE_SIZE; /*!!C (1Way 전체 size) > PAGE_SIZE
+									최소 2Page 이상Cache에 올라갈 수 있어야
+								       Aliasing 도 있을 수 있는것이다.	
+									*/
 		break;
 	case CPU_ARCH_ARMv6:
 		aliasing_icache = read_cpuid_cachetype() & (1 << 11);
@@ -311,11 +326,28 @@ static void __init cacheid_init(void)
 		 * http://community.arm.com/groups/processors/blog/2012/05/14/page-colouring-on-armv6-and-a-bit-on-armv7#MMAP
 		 */
 		unsigned int cachetype = read_cpuid_cachetype();
+		/*!!C
+		 * CTR, Cache Type Register, Read 해옴.
+		 * 0b111 << 29 해서 format 정보 확인. 0b100 ARMv7 format 인지 확인.
+		 * CPU_ARCH_ARMv7 = 0x09, CACHEID_VIPT_NONALIASING = 0x02
+		 *
+		 * cachetype 에서 L1Ip bits L1 instruction cache indexing and tagging policy 확인
+		 * ASID = Address Space Identification (ASID)
+		 * ARMv6이전까지 FCSE(Fast Context-Switch Extension) 를 사용하다가, ARMv6이후부터 ASID 를
+		 * 사용한다. TLB Entry별로 8bit이 추가되고, 거기에 Address Space ID 를 보관한다.
+		 * Page Table 에도 1Bit 이 추가되어 Global 인지 아닌지 판단하는 역활을 한다.(공유 메모리, 공유라이브러리
+		 * 커널 쓰레드 등에서 Global 사용)
+		 * 기존에 Context Switching 할때 마다 flush 하던 것을 flush 하지 않게 하여 성능향상.
+		 * 
+		 * http://blogs.bu.edu/md/2011/12/06/tagged-tlbs-and-context-switching/
+		 * http://techpubs.sgi.com/library/tpl/cgi-bin/getdoc.cgi/hdwr/bks/SGI_Developer/books/R10K_UM/sgi_html/t5.Ver.2.0.book_341.html
+		 * http://msdn.microsoft.com/en-us/library/ee482755(v=winembedded.60).aspx
+		 */
 		if ((cachetype & (7 << 29)) == 4 << 29) {
 			/* ARMv7 register format */
 			arch = CPU_ARCH_ARMv7;
-			cacheid = CACHEID_VIPT_NONALIASING;
-			switch (cachetype & (3 << 14)) {
+			cacheid = CACHEID_VIPT_NONALIASING; /*!!C  Page Coloring 적용된 VIPT */
+			switch (cachetype & (3 << 14)) { /*!!C L1lp 에서 확인 */
 			case (1 << 14):
 				cacheid |= CACHEID_ASID_TAGGED;
 				break;
@@ -326,11 +358,14 @@ static void __init cacheid_init(void)
 		} else {
 			arch = CPU_ARCH_ARMv6;
 			if (cachetype & (1 << 23))
-				cacheid = CACHEID_VIPT_ALIASING;
+				cacheid = CACHEID_VIPT_ALIASING; /*!!C VIPT NONALIASING 는  HW적으로 Coloring 을 지원하는
+								  경우이고, ALIASING 의 경우는 SW적으로 Coloring
+								 을 처리해야 한다. 는 추측을 하고 넘어감 */ 
 			else
 				cacheid = CACHEID_VIPT_NONALIASING;
 		}
-		if (cpu_has_aliasing_icache(arch))
+		if (cpu_has_aliasing_icache(arch)) /*!!C 캐시의1 way size가 Page Size(4KByte)보다 크면 I-Cache 가
+						     ALIASING 으로 분류한다. ARMv6, ARMv7 동일*/
 			cacheid |= CACHEID_VIPT_I_ALIASING;
 	} else {
 		cacheid = CACHEID_VIVT;
@@ -483,19 +518,23 @@ void notrace cpu_init(void)
 #ifdef CONFIG_THUMB2_KERNEL
 #define PLC	"r"
 #else
-#define PLC	"I"
+#define PLC	"I" /*!!C I = Immediate value(상수) */
 #endif
 
 	/*
 	 * setup stacks for re-entrant exception handlers
 	 */
+	/*!!C
+	 * CPSR_c : 0~7 bit 즉 Mode, ARM/Thumb, IRQ/FIQ Enable/Disable (Control Field)
+	 * 
+	 */
 	__asm__ (
-	"msr	cpsr_c, %1\n\t"
-	"add	r14, %0, %2\n\t"
-	"mov	sp, r14\n\t"
-	"msr	cpsr_c, %3\n\t"
-	"add	r14, %0, %4\n\t"
-	"mov	sp, r14\n\t"
+	"msr	cpsr_c, %1\n\t"  /*!!C (PSR_F_BIT|PSR_I_BIT|IRQ_MODE)=0x00000040|0x00000080|0x00000012=0xD2=IRQ Mode */
+	"add	r14, %0, %2\n\t" /*!!C %0=stk, %2= irq[0]의 offset, r14=stk의 irq[0] 주소 */
+	"mov	sp, r14\n\t"     /*!!C IRQ Mode 용 sp에 r14를 넣는다. */
+	"msr	cpsr_c, %3\n\t"  /*!!C 이 이하는 abt mode 와 und 모드에 대해서 반복한다.*/
+	"add	r14, %0, %4\n\t" /*!!Q 각 Mode 별로banked sp와 banked lr 의 값을 설정한다. 왜 인지는 아직 모르겠음  */
+	"mov	sp, r14\n\t"     /*!!Q 좀 더 보고 나중에 다시 봅시다~!??????       */
 	"msr	cpsr_c, %5\n\t"
 	"add	r14, %0, %6\n\t"
 	"mov	sp, r14\n\t"
@@ -503,11 +542,11 @@ void notrace cpu_init(void)
 	    :
 	    : "r" (stk),
 	      PLC (PSR_F_BIT | PSR_I_BIT | IRQ_MODE),
-	      "I" (offsetof(struct stack, irq[0])),
+	      "I" (offsetof(struct stack, irq[0])), /*!!C offset = 0 추측값*/
 	      PLC (PSR_F_BIT | PSR_I_BIT | ABT_MODE),
-	      "I" (offsetof(struct stack, abt[0])),
+	      "I" (offsetof(struct stack, abt[0])), /*!!C offset = 12 */ 
 	      PLC (PSR_F_BIT | PSR_I_BIT | UND_MODE),
-	      "I" (offsetof(struct stack, und[0])),
+	      "I" (offsetof(struct stack, und[0])), /*!!C offset = 24 */
 	      PLC (PSR_F_BIT | PSR_I_BIT | SVC_MODE)
 	    : "r14");
 #endif
@@ -733,9 +772,9 @@ static void __init setup_processor(void)
 	/*!!C
 	 *cahe와 virtual address, physical address 관련 정책은 다시한번
 	 *특집으로 공부
-	 */
-	cacheid_init();
-	cpu_init();
+	 */ 
+	cacheid_init(); /*!!C 11-08 진행 */
+	cpu_init();  /*!!C 11-08 */
 }
 
 void __init dump_machine_table(void)

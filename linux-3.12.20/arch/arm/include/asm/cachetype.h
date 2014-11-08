@@ -49,8 +49,12 @@ extern unsigned int cacheid;
 #define __CACHEID_ALWAYS	(0)
 #define __CACHEID_NEVER		(0)
 #endif
-
-static inline unsigned int __attribute__((pure)) cacheid_is(unsigned int mask)
+/*!!C mask = 0b10 0000
+ * __CACHEID_ALWAYS = 0, ~__CACHEID_NEVER = 0b1111 1110, __CACHEID_ARCH_MIN= 1<<1 | 1<<3 | 1<<4 | 1<<5 = 11 1010
+ * chacheid = 1<<3(CACHEID_ASID_TAGGED) 또는 1<< 5(CACHEID_PIPT) 일듯.
+ * cacheid 가 1<<5 일때만masking 값이 있다. PIPT 인 경우를 의미하는 것이다.(Cacheid 에 PIPT 가 셋팅되는지 확인)
+ */
+ static inline unsigned int __attribute__((pure)) cacheid_is(unsigned int mask)
 {
 	return (__CACHEID_ALWAYS & mask) |
 	       (~__CACHEID_NEVER & __CACHEID_ARCH_MIN & mask & cacheid);

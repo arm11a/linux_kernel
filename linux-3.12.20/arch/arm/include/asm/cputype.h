@@ -87,6 +87,10 @@ extern unsigned int processor_id;
  * 것을 알려주는 역할.
  */
 #ifdef CONFIG_CPU_CP15
+/* !!C 
+ * CTR 32-bit Cache Type Register
+ *
+ * */
 #define read_cpuid(reg)							\
 	({								\
 		unsigned int __val;					\
