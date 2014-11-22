@@ -214,7 +214,7 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 	dt_root = of_get_flat_dt_root();
 	/* !!C
 	 * 컴파일 과정에 arch.info.init 섹션에 각 machine의 description을
-	 * 넣어놓고 여기서 받은 device tree와 비교하여 가장 매칭되는 machine
+	 * 넣어놓고 본 함수에서 받은 device tree와 비교하여 가장 매칭되는 machine
 	 * 을 찾는다
 	 */
 	for_each_machine_desc(mdesc) {

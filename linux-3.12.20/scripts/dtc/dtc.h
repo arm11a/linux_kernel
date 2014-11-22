@@ -65,6 +65,10 @@ typedef uint32_t cell_t;
 #define streq(a, b)	(strcmp((a), (b)) == 0)
 #define strneq(a, b, n)	(strncmp((a), (b), (n)) == 0)
 
+/* !!C
+ * a단위로 align해주는 매크로
+ * ex) 4byte align일 경우 8byte -> 8byte, 9byte -> 12byte
+ */
 #define ALIGN(x, a)	(((x) + (a) - 1) & ~((a) - 1))
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
