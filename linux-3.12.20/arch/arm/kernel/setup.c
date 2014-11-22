@@ -370,7 +370,10 @@ static void __init cacheid_init(void)
 	} else {
 		cacheid = CACHEID_VIVT;
 	}
-
+		/*!!C /arch/arm/mm/flush.c의 flush_cache_range() 등의 함수에서
+		 * cache_is_vivt() 를 이용해 Cache Type 을 확인해서 별도의
+		 * Asm code 처리를 해줘야한다. --> Over Head가 상승함(04-11-15)
+		 */
 	printk("CPU: %s data cache, %s instruction cache\n",
 		cache_is_vivt() ? "VIVT" :
 		cache_is_vipt_aliasing() ? "VIPT aliasing" :
@@ -501,6 +504,10 @@ void notrace cpu_init(void)
 	/*
 	 * This only works on resume and secondary cores. For booting on the
 	 * boot cpu, smp_prepare_boot_cpu is called after percpu area setup.
+	 */
+	/*!!C arch/arm/kernel/smp.c 의 secondary_start_kernel() 에서 두번째
+	 * CPU셋업을 할때 다시 cpu_init() 을 호출하고 두번째 이후 cpu
+	 * 셋업에  사용된다. setpu_per_cpu_areas()  를 해야 의미가 있다.
 	 */
 	set_my_cpu_offset(per_cpu_offset(cpu));
 
@@ -1049,7 +1056,7 @@ void __init setup_arch(char **cmdline_p)
 	const struct machine_desc *mdesc;
 
 	setup_processor();
-	mdesc = setup_machine_fdt(__atags_pointer);
+	mdesc = setup_machine_fdt(__atags_pointer); //04-11-15 시작
 	if (!mdesc)
 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
 	machine_desc = mdesc;
