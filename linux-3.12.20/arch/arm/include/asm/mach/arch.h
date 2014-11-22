@@ -71,6 +71,10 @@ extern const struct machine_desc *machine_desc;
  * Machine type table - also only accessible during boot
  */
 extern const struct machine_desc __arch_info_begin[], __arch_info_end[];
+/* !!C
+ * arch/arm/kernel/vmlinux.lds.S안에 각 machine의 DT_MACHINE_START
+ * 에 선언된 내용을 섹션에 저장하는 부분이 있다.
+ */
 #define for_each_machine_desc(p)			\
 	for (p = __arch_info_begin; p < __arch_info_end; p++)
 

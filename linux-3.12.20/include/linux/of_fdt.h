@@ -41,6 +41,9 @@
  * the job of everybody. It's just a list of u64 pairs (base/size) that
  * ends when size is 0
  */
+/* !!C
+ * boot_param_header 자료구조는 dtb의 header
+ */
 struct boot_param_header {
 	__be32	magic;			/* magic word OF_DT_HEADER */
 	__be32	totalsize;		/* total size of DT block */

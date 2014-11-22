@@ -202,12 +202,21 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 	devtree = phys_to_virt(dt_phys);
 
 	/* check device tree validity */
+	/* !!C
+	 * be32_to_cpu()는 big endian 32bit를 읽어서 CPU가 인식할 수
+	 * 있는 값으로 변환시켜줌
+	 */
 	if (be32_to_cpu(devtree->magic) != OF_DT_HEADER)
 		return NULL;
 
 	/* Search the mdescs for the 'best' compatible value match */
 	initial_boot_params = devtree;
 	dt_root = of_get_flat_dt_root();
+	/* !!C
+	 * 컴파일 과정에 arch.info.init 섹션에 각 machine의 description을
+	 * 넣어놓고 여기서 받은 device tree와 비교하여 가장 매칭되는 machine
+	 * 을 찾는다
+	 */
 	for_each_machine_desc(mdesc) {
 		score = of_flat_dt_match(dt_root, mdesc->dt_compat);
 		if (score > 0 && score < mdesc_score) {

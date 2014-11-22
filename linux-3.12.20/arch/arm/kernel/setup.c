@@ -1056,6 +1056,10 @@ void __init setup_arch(char **cmdline_p)
 	const struct machine_desc *mdesc;
 
 	setup_processor();
+	/* !!C
+	 * __atags_pointer는 arch/arm/kernel/head-common.S
+	 * __mmap_switched_data에서 r6로부터 전달받은 dtb의 시작주소
+	 */
 	mdesc = setup_machine_fdt(__atags_pointer); //04-11-15 시작
 	if (!mdesc)
 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
