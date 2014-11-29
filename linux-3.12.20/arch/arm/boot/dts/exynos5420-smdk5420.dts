@@ -14,6 +14,9 @@
 
 / {
 	model = "Samsung SMDK5420 board based on EXYNOS5420";
+	/*!!C
+	 * exynos5420.dtsi 의 /node 에도 compatible 이 있는데 중복이 되는지???
+	 */
 	compatible = "samsung,smdk5420", "samsung,exynos5420";
 
 	memory {

@@ -34,7 +34,8 @@ char *of_fdt_get_string(struct boot_param_header *blob, u32 offset)
 
 /**
  * of_fdt_get_property - Given a node in the given flat blob, return
- * the property ptr
+ * the property ptr 
+ * tlv 관련한 사진은 11.29후기(임시쓰레드) 사진 참조
  */
 void *of_fdt_get_property(struct boot_param_header *blob,
 		       unsigned long node, const char *name,
@@ -126,6 +127,10 @@ int of_fdt_match(struct boot_param_header *blob, unsigned long node,
 		return 0;
 
 	while (*compat) {
+			  /*!!C
+			   * blob 과 source 의 compact 에 있는 모든 문자열을 비교한다.
+			   * score 가 1이면 0번째 문자열 2면 1 번째 ...
+			   */
 		tmp = of_fdt_is_compatible(blob, node, *compat);
 		if (tmp && (score == 0 || (tmp < score)))
 			score = tmp;
@@ -456,12 +461,18 @@ struct boot_param_header *initial_boot_params;
  * This function is used to scan the flattened device-tree, it is
  * used to extract the memory information at boot before we can
  * unflatten the tree
+ *!!C
+ * XML 을 참조
+ * [tag]  [path]      [tag] [path] [tag] [property] [/tag] [/tag]
+ *  beginNodeRoot     beginNode                    endNode endNodeRoot
+ *  
  */
 int __init of_scan_flat_dt(int (*it)(unsigned long node,
 				     const char *uname, int depth,
 				     void *data),
 			   void *data)
 {
+	//!!C p = dt root
 	unsigned long p = ((unsigned long)initial_boot_params) +
 		be32_to_cpu(initial_boot_params->off_dt_struct);
 	int rc = 0;
@@ -511,6 +522,10 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
  */
 unsigned long __init of_get_flat_dt_root(void)
 {
+	/*!!C
+	 * fdt 의 시작점을 찾아준다
+	 *  * be32_to_cpu : cpu에 맞는 값으로 변경시켜주는 매크로.
+	 */
 	unsigned long p = ((unsigned long)initial_boot_params) +
 		be32_to_cpu(initial_boot_params->off_dt_struct);
 
@@ -518,6 +533,9 @@ unsigned long __init of_get_flat_dt_root(void)
 		p += 4;
 	BUG_ON(be32_to_cpup((__be32 *)p) != OF_DT_BEGIN_NODE);
 	p += 4;
+	/*!!C
+	 * 첫번째 노드를 찾아서 그노드의 처음 스티링을 건너뛴 다음 4byte align 자리 리턴
+	 */
 	return ALIGN(p + strlen((char *)p) + 1, 4);
 }
 
@@ -744,7 +762,11 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
 
 	return 0;
 }
-
+/*!!C
+ * Node chosen ( bootargs = "console=ttySAC2,115200 init=/linuxrc";)
+ *
+ * arch/arm/boot/dts/exynos5-smdk5420.dts
+ */
 int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
 				     int depth, void *data)
 {
@@ -757,7 +779,7 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
 	    (strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen@0") != 0))
 		return 0;
 
-	early_init_dt_check_for_initrd(node);
+	early_init_dt_check_for_initrd(node); /*!!C 14.11.29 */
 
 	/* Retrieve command line */
 	p = of_get_flat_dt_prop(node, "bootargs", &l);

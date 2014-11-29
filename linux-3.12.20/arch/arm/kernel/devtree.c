@@ -211,11 +211,17 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 
 	/* Search the mdescs for the 'best' compatible value match */
 	initial_boot_params = devtree;
+
+	/*!!C
+	 * 우선 다음 소스는 dt_struct 의 시작점을 가리킨다 나머지는 dtb 특집필요 
+	 * 처음 정보는 property 일듯하다.
+	 */
 	dt_root = of_get_flat_dt_root();
 	/* !!C
 	 * 컴파일 과정에 arch.info.init 섹션에 각 machine의 description을
-	 * 넣어놓고 본 함수에서 받은 device tree와 비교하여 가장 매칭되는 machine
-	 * 을 찾는다
+	 * 넣어놓고 본 함수에서 받은 device tree blobb 와 비교하여 가장 적은 score 를 
+	 * 받는 machine description을 선택한다
+	 *  best = 가장작은 스코어
 	 */
 	for_each_machine_desc(mdesc) {
 		score = of_flat_dt_match(dt_root, mdesc->dt_compat);
@@ -242,6 +248,9 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 		dump_machine_table(); /* does not return */
 	}
 
+	/*!!C
+	 * blob 에서 "model" property 를 가져온다
+	 */
 	model = of_get_flat_dt_prop(dt_root, "model", NULL);
 	if (!model)
 		model = of_get_flat_dt_prop(dt_root, "compatible", NULL);
