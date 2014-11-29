@@ -478,6 +478,15 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
 	int rc = 0;
 	int depth = -1;
 
+    /*!!C
+     * cloudrain21 추가 
+     *
+     * 결국 아래 코드는 dt root 부터 node 들만 찾아서
+     * 각 node 에 맞는 path, depth 등의 값을 구해서
+     * callback 함수인 it 를 호출해주기 위한 것이다.
+     * callback 함수 it 는 of_scan_flat_dt 함수의 첫번째 인자로 
+     * 넘겨주는 함수 이름을 따라가보면 된다.
+     */
 	do {
 		u32 tag = be32_to_cpup((__be32 *)p);
 		const char *pathp;

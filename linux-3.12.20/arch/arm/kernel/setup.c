@@ -719,6 +719,12 @@ static void __init setup_processor(void)
 	 * 2. 여기서 말하는 MULTI의 의미가 CPU가 여러개 있는 것을 의미하는건지?
 	 */
 
+    /*!!C
+     * - cloudrain21
+     * proc_info_list 구조체는 MULTI_CPU 일 경우에만 사용됨.
+     * arch/arm/include/asm/procinfo.h comment 참조 
+     */
+
 #ifdef MULTI_CPU
 	processor = *list->proc;
 #endif

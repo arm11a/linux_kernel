@@ -258,6 +258,15 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 		model = "<unknown>";
 	pr_info("Machine: %s, model: %s\n", mdesc_best->name, model);
 
+	/*!!C
+     * cloudrain21 추가 
+     *
+     * of_scan_flag_dt 함수는 dtb tree 의 root 부터
+     * node 들만 쭈욱 따라가면서 첫번째 인자인 callback 함수를
+     * 차례로 호출해준다.
+     * callback 함수 내에서는 인자로 제공된 node pointer 를 이용하여
+     * 해당 node 의 property 들 중 원하는 것을 찾아서 초기화 작업에 이용하게 된다.
+     */
 	/* Retrieve various information from the /chosen node */
 	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
 	/* Initialize {size,address}-cells info */
