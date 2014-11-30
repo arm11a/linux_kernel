@@ -1130,7 +1130,9 @@ void __init setup_arch(char **cmdline_p)
      *  sort 함수의 사용방법 알아두면 좋음.
      */
 	sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
+
 	sanity_check_meminfo();
+
 	arm_memblock_init(&meminfo, mdesc);
 
 	paging_init(mdesc);
@@ -1139,6 +1141,12 @@ void __init setup_arch(char **cmdline_p)
 	if (mdesc->restart)
 		arm_pm_restart = mdesc->restart;
 
+    /*!!C
+     * cloudrain21
+     *  flat 하게 device tree binary 를 tlv 형태로 펼쳐놓은 것을
+     *  이제 앞으로 사용하기 좋도록 진짜 tree 형태로 만드는 작업이다.
+     *  tree 의 각 node 의 자료구조는 struct device_node 이다.
+     */
 	unflatten_device_tree();
 
 	arm_dt_init_cpu_maps();
