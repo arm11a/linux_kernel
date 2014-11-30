@@ -7,6 +7,11 @@
 #include <linux/kallsyms.h>
 #include <linux/sched.h>
 
+/*!!C
+ * cloudrain21 추가
+ *
+ * 현재 task 가 수행중인 cpu 번호 얻어오기 
+ */
 notrace unsigned int debug_smp_processor_id(void)
 {
 	unsigned long preempt_count = preempt_count();

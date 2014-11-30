@@ -1054,6 +1054,13 @@ static ssize_t extract_entropy_user(struct entropy_store *r, void __user *buf,
  * TCP sequence numbers, etc.  It does not use the hw random number
  * generator, if available; use get_random_bytes_arch() for that.
  */
+/*!!C
+ * cloudrain21 추가 
+ *
+ * get_random_bytes 함수는 위의 설명에 있듯이 kernel 외부로도
+ * export 되어 괜찮은 random 값을 얻는데 사용될 수 있다.
+ * key 생성이나 tcp 의 seq 번호 등을 딸 때 사용하면 적합하다.
+ */
 void get_random_bytes(void *buf, int nbytes)
 {
     /*!!C

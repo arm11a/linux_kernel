@@ -1061,10 +1061,29 @@ void __init setup_arch(char **cmdline_p)
 {
 	const struct machine_desc *mdesc;
 
+    /*!!C
+     * cloudrain21 추가 
+     * 
+     * 커널이 수행되고 있는 프로세서의 정보(proc_info_list 정보)를
+     * 찾아서 그 중 몇가지 정보를 global 변수로 등록한다.
+     * cache type 등을 담고 있는 cacheid 값도 설정하고,
+     * 하드웨어 지원사양을 담고 있는 hwcaps 정보도 설정한다.
+     * 모두 나중에 참조할 수 있도록 여기저기서 가져온 processor 정보를
+     * global 변수에 초기화한다.
+     */
 	setup_processor();
-	/* !!C
+
+	/*!!C
+     * cloudrain21 추가
+     *
+     * device tree 의 정보를 검색 참조하여 machine_desc table 
+     * (__arch_info_begin~end)중에서 가장 적합한 것을 찾아낸다.
+     * 이 때 device tree 를 검색해나가는 과정에서 노드 정보를
+     * 이용하여 필요한 초기화를 수행하기도 한다.
+     *
 	 * __atags_pointer는 arch/arm/kernel/head-common.S
 	 * __mmap_switched_data에서 r6로부터 전달받은 dtb의 시작주소
+     * (또는 atags 시작주소)
 	 */
 	mdesc = setup_machine_fdt(__atags_pointer); //04-11-15 시작
 	if (!mdesc)
@@ -1074,9 +1093,18 @@ void __init setup_arch(char **cmdline_p)
 
 	setup_dma_zone(mdesc);
 
+    /*!!C
+     * cloudrain21
+     *  각 reboot 모드가 무엇인지 확인하고 넘어가자.
+     */
 	if (mdesc->reboot_mode != REBOOT_HARD)
 		reboot_mode = mdesc->reboot_mode;
 
+    /*!!C
+     * cloudrain21
+     *  커널구조 책에서 mm_struct 에 대한 개념 잠깐 보고 넘어가자.
+     *  (mem 자료구조의 연결관계 잠깐 확인)
+     */
 	init_mm.start_code = (unsigned long) _text;
 	init_mm.end_code   = (unsigned long) _etext;
 	init_mm.end_data   = (unsigned long) _edata;
@@ -1086,8 +1114,21 @@ void __init setup_arch(char **cmdline_p)
 	strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
 	*cmdline_p = cmd_line;
 
+    /*!!C
+     * cloudrain21
+     *  boot_command_line 을 early parsing 해보는데
+     *  크게 중요한 일은 없어보임.
+     *  함수의 구조만 유의해서 왜 하는지만 잠깐 파악하고 넘어가자.
+     */
 	parse_early_param();
 
+    /*!!C
+     * cloudrain21
+     *  setup_machine_fdt 내에서 cell 프로퍼티를 분석하여
+     *  meminfo 에 저장해둔 bank 정보들의 주소를 서로 비교하여
+     *  순서대로 sorting 한다.
+     *  sort 함수의 사용방법 알아두면 좋음.
+     */
 	sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
 	sanity_check_meminfo();
 	arm_memblock_init(&meminfo, mdesc);

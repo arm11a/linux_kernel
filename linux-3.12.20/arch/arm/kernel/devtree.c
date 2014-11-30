@@ -202,7 +202,7 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 	devtree = phys_to_virt(dt_phys);
 
 	/* check device tree validity */
-	/* !!C
+	/*!!C
 	 * be32_to_cpu()는 big endian 32bit를 읽어서 CPU가 인식할 수
 	 * 있는 값으로 변환시켜줌
 	 */
@@ -217,7 +217,8 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 	 * 처음 정보는 property 일듯하다.
 	 */
 	dt_root = of_get_flat_dt_root();
-	/* !!C
+
+	/*!!C
 	 * 컴파일 과정에 arch.info.init 섹션에 각 machine의 description을
 	 * 넣어놓고 본 함수에서 받은 device tree blobb 와 비교하여 가장 적은 score 를 
 	 * 받는 machine description을 선택한다

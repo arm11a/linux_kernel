@@ -659,6 +659,12 @@ int __init of_scan_flat_dt_by_path(const char *path,
  * early_init_dt_check_for_initrd - Decode initrd location from flat tree
  * @node: reference to node containing initrd location ('chosen')
  */
+/*!!C
+ * cloudrain21
+ *
+ * node 정보에서 initrd start, end 프로퍼티를 읽어서
+ * initrd 관련 global 변수에 설정해준다.
+ */
 void __init early_init_dt_check_for_initrd(unsigned long node)
 {
 	u64 start, end;
@@ -689,6 +695,14 @@ inline void early_init_dt_check_for_initrd(unsigned long node)
 
 /**
  * early_init_dt_scan_root - fetch the top level address and size cells
+ */
+
+/*!!C
+ * cloudrain21
+ *
+ *  node 의 프로퍼티 중에서 #size-cells 와 #address-cells 값을 읽어서
+ *  global 변수에 저장한다.
+ *  cell 에 대한 좀더 정확한 의미 파악 필요.
  */
 int __init early_init_dt_scan_root(unsigned long node, const char *uname,
 				   int depth, void *data)
@@ -725,6 +739,14 @@ u64 __init dt_mem_next_cell(int s, __be32 **cellp)
 
 /**
  * early_init_dt_scan_memory - Look for an parse memory nodes
+ */
+/*!!C
+ * cloudrain21
+ *
+ * memory 프로퍼티에 설정된 memory cell 들 중
+ * 한쌍의 주소와 크기를 bank 라고 함.
+ * 이러한 bank 는 여러개, 즉 여러 cell 일 수 있고 이러한
+ * 여러 bank 설정들은 global 자료구조인 meminfo 에 저장된다.
  */
 int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
 				     int depth, void *data)
@@ -773,8 +795,13 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
 }
 /*!!C
  * Node chosen ( bootargs = "console=ttySAC2,115200 init=/linuxrc";)
- *
  * arch/arm/boot/dts/exynos5-smdk5420.dts
+ *
+ * cloudrain21
+ *  node 가 chosen 노드일 때 initrd 관련 설정을 읽어서 global 에 초기화하고,
+ *  boot argument 프로퍼티가 있을 경우 이 value 를 global 변수인
+ *  .init.data section 의 boot_command_line 에 넣어준다.
+ *  이 boot_command_line string 은 후에 command 를 parse 할 때 사용될 것이다.
  */
 int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
 				     int depth, void *data)
