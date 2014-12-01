@@ -1091,6 +1091,10 @@ void __init setup_arch(char **cmdline_p)
 	machine_desc = mdesc;
 	machine_name = mdesc->name;
 
+    /*!!C
+     * cloudrain21
+     *  CONFIG_ZONE_DMA 가 설정되어 있지 않으니 건너뛰자.
+     */
 	setup_dma_zone(mdesc);
 
     /*!!C
@@ -1104,6 +1108,12 @@ void __init setup_arch(char **cmdline_p)
      * cloudrain21
      *  커널구조 책에서 mm_struct 에 대한 개념 잠깐 보고 넘어가자.
      *  (mem 자료구조의 연결관계 잠깐 확인)
+     *  
+     *  start_code : text 영역 시작 
+     *  end_code   : text 영역 끝 
+     *  end_data   : data 영역 끝 
+     *  brk        : bss 영역의 끝 = heap 할당의 시작 
+     *               break 라고 부르며 break 값을 늘리면서 heap 을 할당 
      */
 	init_mm.start_code = (unsigned long) _text;
 	init_mm.end_code   = (unsigned long) _etext;
@@ -1116,9 +1126,9 @@ void __init setup_arch(char **cmdline_p)
 
     /*!!C
      * cloudrain21
-     *  boot_command_line 을 early parsing 해보는데
-     *  크게 중요한 일은 없어보임.
-     *  함수의 구조만 유의해서 왜 하는지만 잠깐 파악하고 넘어가자.
+     *  boot_command_line 을 parsing 하여 이름과 같은 항목을
+     *  kernel_param 또는 .init.setup section 에서 찾아서
+     *  value 를 설정해준다.
      */
 	parse_early_param();
 
@@ -1131,8 +1141,18 @@ void __init setup_arch(char **cmdline_p)
      */
 	sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
 
+    /*!!C
+     * meminfo 에 저장해둔 bank 의 start, end, highmem 정보를
+     * 검증하고 조정한다.
+     */
 	sanity_check_meminfo();
 
+    /*!!C
+     * 위에서 meminfo 에 저장해둔 bank 들과, kernel 영역, device tree, dma 등에
+     * 대한 memory block 들을 memblock 자료구조 속에 모두 기록해둔다.
+     * 이 memblock 자료구조가 나중에 vm_area_struct 를 할당하고 구성하는데
+     * 사용되는건지 어떤건지는 아직 모르겠다.
+     */
 	arm_memblock_init(&meminfo, mdesc);
 
 	paging_init(mdesc);

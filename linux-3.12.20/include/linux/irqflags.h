@@ -121,7 +121,7 @@
 	({						\
 		unsigned long _flags;			\
         /*!!C
-         * _flags <= cpsr register
+         * _flags <- cpsr register
          */
 		raw_local_save_flags(_flags);		\
 

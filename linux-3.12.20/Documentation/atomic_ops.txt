@@ -6,20 +6,29 @@
 	This document is intended to serve as a guide to Linux port
 maintainers on how to implement atomic counter, bitops, and spinlock
 interfaces properly.
+이 문서는 atomic counter, bitops, spinlock 인터페이스를 어떻게 적절하게
+이용할 수 있는지에 대해 가이드를 제공한다.
 
 	The atomic_t type should be defined as a signed integer.
 Also, it should be made opaque such that any kind of cast to a normal
 C integer type will fail.  Something like the following should
 suffice:
+atomic_t 타입은 하나의 signed integer 로 정의되어야 한다.
 
 	typedef struct { int counter; } atomic_t;
 
 Historically, counter has been declared volatile.  This is now discouraged.
 See Documentation/volatile-considered-harmful.txt for the complete rationale.
+보통 예전부터 counter 가 volatile 로 선언되어왔다. 이 방법은 현재는 권장되지 않는다.
+그 이유는 volatile-considered-harmful.txt 문서를 봐라.
 
 local_t is very similar to atomic_t. If the counter is per CPU and only
 updated by one CPU, local_t is probably more appropriate. Please see
 Documentation/local_ops.txt for the semantics of local_t.
+
+local_t 는 atomic_t 와 유사하다. counter 가 percpu 이고 하나의 cpu 에 의해서만
+갱신된다면, local_t 가 아마도 더 적절할 것이다.
+Document/local_ops.txt 파일을 참조해라.
 
 The first operations to implement for atomic_t's are the initializers and
 plain reads.

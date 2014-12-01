@@ -177,6 +177,15 @@ static char *next_arg(char *args, char **param, char **val)
 }
 
 /* Args looks like "foo=bar,bar2 baz=fuz wiz". */
+/*!!C -------------------------------------------------
+ * kernel_param 인자가 넘어온다면 해당 kernel parameter 중에서
+ * args 와 일치하는 것을 찾을 것이고(찾아서 값을 설정해준다-ops.set),
+ * kernel_param 인자가 NULL 이거나 찾지 못했으면, 
+ * unknown 함수를 통해 할일을 지정한다.
+ * 만약 parse_early_options 함수에서처럼 do_early_param 함수가
+ * unknown 함수로 주어지면 __setup_start, 즉 .init.setup section 에서
+ * 해당 args 와 일치하는 것을 찾는다.
+ *----------------------------------------------------*/
 int parse_args(const char *doing,
 	       char *args,
 	       const struct kernel_param *params,
@@ -197,6 +206,9 @@ int parse_args(const char *doing,
 		int ret;
 		int irq_was_disabled;
 
+        /*!!C -------------------------------------------------
+         * param = val
+         *----------------------------------------------------*/
 		args = next_arg(args, &param, &val);
 		irq_was_disabled = irqs_disabled();
 		ret = parse_one(param, val, doing, params, num,

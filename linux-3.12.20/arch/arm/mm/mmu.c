@@ -969,6 +969,12 @@ void __init debug_ll_io_init(void)
 }
 #endif
 
+/*!!C -------------------------------------------------
+ * 2^10 = 1K
+ * 2^20 = 1M
+ * 240 << 20 은 한마디로 240 M 라는 얘기 
+ * 그런데 왜 240 M를 뺐을까 ?
+ *----------------------------------------------------*/
 static void * __initdata vmalloc_min =
 	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
 
@@ -1006,6 +1012,10 @@ void __init sanity_check_meminfo(void)
 {
 	phys_addr_t memblock_limit = 0;
 	int i, j, highmem = 0;
+
+    /*!!C -------------------------------------------------
+     * vmalloc_limit = himem 의 시작 
+     *----------------------------------------------------*/
 	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1;
 
 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {

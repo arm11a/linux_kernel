@@ -393,6 +393,10 @@ static noinline void __init_refok rest_init(void)
 }
 
 /* Check for early params. */
+/*!!C -------------------------------------------------
+ * .init.setup section 을 검색하여 같은 항목이 있으면
+ * setup_func 를 통해 값을 저장해준다. 
+ *----------------------------------------------------*/
 static int __init do_early_param(char *param, char *val, const char *unused)
 {
 	const struct obs_kernel_param *p;

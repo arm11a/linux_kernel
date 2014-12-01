@@ -226,15 +226,29 @@ struct vm_region {
  * library, the executable area etc).
  */
 struct vm_area_struct {
+    /*!!C -------------------------------------------------
+     * Tree 검색이 빠르도록 rb tree 관련 변수까지는
+     * 첫번째 cache line 에 속하도록 구조를 잡고 있다.
+     *----------------------------------------------------*/
 	/* The first cache line has the info for VMA tree walking. */
 
+    /*!!C -------------------------------------------------
+     * vm_area_struct 가 나타내는 segment 의 시작과 끝 주소 
+     *----------------------------------------------------*/
 	unsigned long vm_start;		/* Our start address within vm_mm. */
 	unsigned long vm_end;		/* The first byte after our end address
 					   within vm_mm. */
 
 	/* linked list of VM areas per task, sorted by address */
+    /*!!C -------------------------------------------------
+     * vm_area_struct 는 리스트로 연결된다. 주소로 정렬.
+     *----------------------------------------------------*/
 	struct vm_area_struct *vm_next, *vm_prev;
 
+    /*!!C -------------------------------------------------
+     * 같은 task 에 속하는 vm_area_struct 끼리는 red black
+     * tree 로 연결된다.
+     *----------------------------------------------------*/
 	struct rb_node vm_rb;
 
 	/*
@@ -245,10 +259,20 @@ struct vm_area_struct {
 	 */
 	unsigned long rb_subtree_gap;
 
+    /*!!C -------------------------------------------------
+     * 두번째 cache line 은 여기부터 
+     *----------------------------------------------------*/
 	/* Second cache line starts here. */
 
+    /*!!C -------------------------------------------------
+     * 내가 속한 mm_struct 
+     *----------------------------------------------------*/
 	struct mm_struct *vm_mm;	/* The address space we belong to. */
 	pgprot_t vm_page_prot;		/* Access permissions of this VMA. */
+
+    /*!!C -------------------------------------------------
+     * region 에 대한 접근 제어 (include/linux/mm.h 참조)
+     *----------------------------------------------------*/
 	unsigned long vm_flags;		/* Flags, see mm.h. */
 
 	/*
@@ -275,11 +299,24 @@ struct vm_area_struct {
 	struct anon_vma *anon_vma;	/* Serialized by page_table_lock */
 
 	/* Function pointers to deal with this struct. */
+    /*!!C -------------------------------------------------
+     * 이 vm_area_struct 를 다룰 수 있는 function pointer 들 모음 
+     *----------------------------------------------------*/
 	const struct vm_operations_struct *vm_ops;
 
+    /*!!C -------------------------------------------------
+     * 이 세그먼트가 실제 실행 파일의 어느 위치에 있는지를 나타낸다.
+     * PAGE_SIZE 단위의 값이다.
+     * 이러한 file 정보들은 page fault 가 발생했을 때 파일의
+     * 어느 위치를 읽어야하는지를 결정할 때 사용된다.
+     *----------------------------------------------------*/
 	/* Information about our backing store: */
 	unsigned long vm_pgoff;		/* Offset (within vm_file) in PAGE_SIZE
 					   units, *not* PAGE_CACHE_SIZE */
+
+    /*!!C -------------------------------------------------
+     * 이 세그먼트가 속하는 실행파일 정보를 가리킨다.
+     *----------------------------------------------------*/
 	struct file * vm_file;		/* File we map to (can be NULL). */
 	void * vm_private_data;		/* was vm_pte (shared mem) */
 
@@ -323,9 +360,64 @@ struct mm_rss_stat {
 };
 
 struct kioctx_table;
+
+/*!!C -------------------------------------------------
+ *  간단히 정리하면 아래와 같다.
+ *  (리눅스커널 내부구조 104 page 참조)
+ *
+ *    - mm_struct 는 task 의 메모리 관리를 담당한다.
+ *    - vm_area_struct 는 segment 에 대한 정보이다.
+ *      예를 들어, data segment 를 구성하는 여러개의 메모리 조각들을
+ *      vm_area_struct 의 list 로 연결한다.
+ *    - 같은 task 에 속한 vm_area_struct 들은 red black tree 로 연결된다. (mm_rb)
+ *    - mm_struct 는 env_end, arg_end, arg_start, start_stack, brk, end_data 등
+ *      task 의 가상 메모리 구조에 대한 변수들을 가진다. 
+ *
+ *  task_struct
+ *      *mm -----> mm_struct
+ *                    *mmap ------> vm_area_struct
+ *                    *mm_rb                vm_start,vm_end
+ *                    *mmap_cache          *vm_next ------------> vm_area_struct
+ *                                         *vm_prev
+ *                                          vm_flags
+ *      *pgd
+ *       start_code, end_code, start_data
+ *       end_data, start_brk, brk, start_stack
+ *       ...
+ *
+ *                   +----------+           0xffffffff
+ *                   |          | kernel
+ *       env_end --> +----------+           0xc0000000
+ *       arg_end --> |          |
+ *     arg_start --> |          | stack
+ *   start_stack --> +----------+
+ *                   |     |    |
+ *                         |
+ *                         V
+ *                         A
+ *                         |     
+ *           brk --> +----------+
+ *                   |          | bss  --+
+ *      end_data --> +----------+        |
+ *                   |          | data   | program
+ *      end_code --> +----------+        |
+ *                   |          | text --+
+ *    start_code --> +----------+
+ *----------------------------------------------------*/
 struct mm_struct {
+    /*!!C -------------------------------------------------
+     * vm_area_struct list 를 가리킨다.
+     *----------------------------------------------------*/
 	struct vm_area_struct * mmap;		/* list of VMAs */
+
+    /*!!C -------------------------------------------------
+     * 같은 task 에 속한 vm_area_struct 들을 관리한다.
+     *----------------------------------------------------*/
 	struct rb_root mm_rb;
+
+    /*!!C -------------------------------------------------
+     * 최근에 접근한 vm_area_struct 를 가리킨다.
+     *----------------------------------------------------*/
 	struct vm_area_struct * mmap_cache;	/* last find_vma result */
 #ifdef CONFIG_MMU
 	unsigned long (*get_unmapped_area) (struct file *filp,
@@ -336,6 +428,10 @@ struct mm_struct {
 	unsigned long mmap_legacy_base;         /* base of mmap area in bottom-up allocations */
 	unsigned long task_size;		/* size of task vm space */
 	unsigned long highest_vm_end;		/* highest vma end address */
+
+    /*!!C -------------------------------------------------
+     * page directory 의 시작점 물리 주소(page frame 주소) 
+     *----------------------------------------------------*/
 	pgd_t * pgd;
 	atomic_t mm_users;			/* How many users with user space? */
 	atomic_t mm_count;			/* How many references to "struct mm_struct" (users count as 1) */

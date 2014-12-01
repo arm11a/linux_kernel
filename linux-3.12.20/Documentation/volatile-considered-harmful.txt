@@ -8,12 +8,24 @@ being used.  In other words, they have been known to treat volatile types
 as a sort of easy atomic variable, which they are not.  The use of volatile in
 kernel code is almost never correct; this document describes why.
 
+C 프로그래머들은 변수가 현재 스레드의 실행 영역 외에서 변경될 수 있다는 것을
+의미하도록 volatile 을 사용해왔다. 결과적으로 그들은 종종 volatile 을 공용 데이터 구조체가 사용되는 커널 코드에서 사용한다.
+즉, 그들은 volatile type 을 일종의 쉽게 사용할 수 있는 atomic 변수로 취급하고 있다.
+실제로는 그렇지 않은데 말이다.
+커널 코드에서의 volatile 의 사용은 대부분 올바르지 않다.
+이 문서에서 왜 그런지 설명한다.
+
 The key point to understand with regard to volatile is that its purpose is
 to suppress optimization, which is almost never what one really wants to
 do.  In the kernel, one must protect shared data structures against
 unwanted concurrent access, which is very much a different task.  The
 process of protecting against unwanted concurrency will also avoid almost
 all optimization-related problems in a more efficient way.
+
+volatile 을 이해하는 핵심 키포인트는 그것의 목적이 최적화를 억제하기 위한 것이라는 점이다.
+전혀 원하지 않는 최적화를 말이다.
+커널에서는 공유 데이터 구조체에 대한 완전히 다른 task 의 원하지 않는 동시 접근을 보호해야 한다.
+그런 원하지 않는 동시 접근을 막아내는 과정은 또한 더 효과적으로 거의 모든 최적화 관련 문제들을 피할 것이다.
 
 Like volatile, the kernel primitives which make concurrent access to data
 safe (spinlocks, mutexes, memory barriers, etc.) are designed to prevent
@@ -22,7 +34,14 @@ need to use volatile as well.  If volatile is still necessary, there is
 almost certainly a bug in the code somewhere.  In properly-written kernel
 code, volatile can only serve to slow things down.
 
+volatile 처럼 spinlock, mutex, memory barrier 같은 데이터에 대한 동시접근을 안전하게 만들어주는 커널의 primitive 들은 원하지 않는 최적화를 막도록 설계된다.
+그것들이 적절하게 이용된다면 volatile 까지 사용할 필요는 없어진다.
+volatile 이 여전히 필수적이라면, 이는 거의 확실히 코드 어디엔가 버그가 있다는 것이다.
+적절하게 작성된 커널 코드에서는 volatile 은 단지 동작을 느리게 만든다.
+
 Consider a typical block of kernel code:
+
+일반적인 커널 코드 블럭을 고려해보면,
 
     spin_lock(&the_lock);
     do_something_on(&shared_data);
@@ -39,12 +58,29 @@ spin_lock() call, since it acts as a memory barrier, will force it to
 forget anything it knows.  There will be no optimization problems with
 accesses to that data.
 
+모든 코드가 lock 규칙을 따른다면, lock 이 잡혀있을동안 공유데이터의 예측하지 못한
+변경은 있을 수 없다. 그 데이터를 이용하려는 다른 모든 코드는 lock 을 기다려야 한다.
+spinlock primitive 는 메모리 배리어처럼 동작한다. 즉, 데이터에 대한 접근이
+spinlock primitives 를 넘어서도록 최적화되지 않는다.
+그래서, 컴파일러는 공유 데이터에 무엇이 있을지 알겠지만, 메모리 배리어처럼
+동작하기 때문에, spin_lock()호출이 그 안다는 사실을 모두 잊도록 만들 것이다.
+그 데이터에 대한 접근 관련한 최적화문제는 없을 것이다.
+
+
 If shared_data were declared volatile, the locking would still be
 necessary.  But the compiler would also be prevented from optimizing access
 to shared_data _within_ the critical section, when we know that nobody else
 can be working with it.  While the lock is held, shared_data is not
 volatile.  When dealing with shared data, proper locking makes volatile
 unnecessary - and potentially harmful.
+
+공유 데이터가 volatile 로 선언되었다면, 그래도 여전히 locking 은 필요하다.
+하지만, 다른 누구도 공유데이터를 이용할 수 없다는 것을 알기 때문에,
+컴파일러는 또한 critical 영역내의 공유데이터에 대한 접근을 최적화하는 것이 막힐 것이다.
+lock 이 잡혀 있는 동안 공유데이터는 volatile 이 아니다.
+공유데이터를 취급할 때는 적절한 locking 이 volatile 을 불필요하게-그리고
+오히려 해롭게 만든다.
+
 
 The volatile storage class was originally meant for memory-mapped I/O
 registers.  Within the kernel, register accesses, too, should be protected
