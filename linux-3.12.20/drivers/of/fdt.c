@@ -91,7 +91,7 @@ int of_fdt_is_compatible(struct boot_param_header *blob,
 	const char *cp;
 	unsigned long cplen, l, score = 0;
 
-	/* !!C
+	/*!!C
 	 * node의 "compatible"에 해당하는 value의 포인터를 가지고 와서
 	 * cp에 저장한다. blob은 string의 offset을 사용하기 위해서 필요하다.
 	 */
@@ -100,7 +100,7 @@ int of_fdt_is_compatible(struct boot_param_header *blob,
 		return 0;
 	while (cplen > 0) {
 		score++;
-		/* !!C
+		/*!!C
 		 * cp와 compat의 값을 비교
 		 * 비교횟수만큼 score가 올라가나 score의 의미에 대해선 좀 더
 		 * 생각해볼 필요가 있음
