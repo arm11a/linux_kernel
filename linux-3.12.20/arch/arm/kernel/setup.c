@@ -1061,7 +1061,7 @@ void __init setup_arch(char **cmdline_p)
 {
 	const struct machine_desc *mdesc;
 
-    /*!!C
+    /*!!C -------------------------------------------------
      * cloudrain21 추가 
      * 
      * 커널이 수행되고 있는 프로세서의 정보(proc_info_list 정보)를
@@ -1070,10 +1070,10 @@ void __init setup_arch(char **cmdline_p)
      * 하드웨어 지원사양을 담고 있는 hwcaps 정보도 설정한다.
      * 모두 나중에 참조할 수 있도록 여기저기서 가져온 processor 정보를
      * global 변수에 초기화한다.
-     */
+     *----------------------------------------------------*/
 	setup_processor();
 
-	/*!!C
+    /*!!C -------------------------------------------------
      * cloudrain21 추가
      *
      * device tree 의 정보를 검색 참조하여 machine_desc table 
@@ -1084,27 +1084,27 @@ void __init setup_arch(char **cmdline_p)
 	 * __atags_pointer는 arch/arm/kernel/head-common.S
 	 * __mmap_switched_data에서 r6로부터 전달받은 dtb의 시작주소
      * (또는 atags 시작주소)
-	 */
+     *----------------------------------------------------*/
 	mdesc = setup_machine_fdt(__atags_pointer); //04-11-15 시작
 	if (!mdesc)
 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
 	machine_desc = mdesc;
 	machine_name = mdesc->name;
 
-    /*!!C
+    /*!!C -------------------------------------------------
      * cloudrain21
      *  CONFIG_ZONE_DMA 가 설정되어 있지 않으니 건너뛰자.
-     */
+     *----------------------------------------------------*/
 	setup_dma_zone(mdesc);
 
-    /*!!C
+    /*!!C -------------------------------------------------
      * cloudrain21
      *  각 reboot 모드가 무엇인지 확인하고 넘어가자.
-     */
+     *----------------------------------------------------*/
 	if (mdesc->reboot_mode != REBOOT_HARD)
 		reboot_mode = mdesc->reboot_mode;
 
-    /*!!C
+    /*!!C -------------------------------------------------
      * cloudrain21
      *  커널구조 책에서 mm_struct 에 대한 개념 잠깐 보고 넘어가자.
      *  (mem 자료구조의 연결관계 잠깐 확인)
@@ -1114,7 +1114,7 @@ void __init setup_arch(char **cmdline_p)
      *  end_data   : data 영역 끝 
      *  brk        : bss 영역의 끝 = heap 할당의 시작 
      *               break 라고 부르며 break 값을 늘리면서 heap 을 할당 
-     */
+     *----------------------------------------------------*/
 	init_mm.start_code = (unsigned long) _text;
 	init_mm.end_code   = (unsigned long) _etext;
 	init_mm.end_data   = (unsigned long) _edata;
@@ -1124,35 +1124,35 @@ void __init setup_arch(char **cmdline_p)
 	strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
 	*cmdline_p = cmd_line;
 
-    /*!!C
+    /*!!C -------------------------------------------------
      * cloudrain21
      *  boot_command_line 을 parsing 하여 이름과 같은 항목을
      *  kernel_param 또는 .init.setup section 에서 찾아서
      *  value 를 설정해준다.
-     */
+     *----------------------------------------------------*/
 	parse_early_param();
 
-    /*!!C
+    /*!!C -------------------------------------------------
      * cloudrain21
      *  setup_machine_fdt 내에서 cell 프로퍼티를 분석하여
      *  meminfo 에 저장해둔 bank 정보들의 주소를 서로 비교하여
      *  순서대로 sorting 한다.
      *  sort 함수의 사용방법 알아두면 좋음.
-     */
+     *----------------------------------------------------*/
 	sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
 
-    /*!!C
+    /*!!C -------------------------------------------------
      * meminfo 에 저장해둔 bank 의 start, end, highmem 정보를
      * 검증하고 조정한다.
-     */
+     *----------------------------------------------------*/
 	sanity_check_meminfo();
 
-    /*!!C
+    /*!!C -------------------------------------------------
      * 위에서 meminfo 에 저장해둔 bank 들과, kernel 영역, device tree, dma 등에
      * 대한 memory block 들을 memblock 자료구조 속에 모두 기록해둔다.
      * 이 memblock 자료구조가 나중에 vm_area_struct 를 할당하고 구성하는데
      * 사용되는건지 어떤건지는 아직 모르겠다.
-     */
+     *----------------------------------------------------*/
 	arm_memblock_init(&meminfo, mdesc);
 
 	paging_init(mdesc);
@@ -1161,12 +1161,12 @@ void __init setup_arch(char **cmdline_p)
 	if (mdesc->restart)
 		arm_pm_restart = mdesc->restart;
 
-    /*!!C
+    /*!!C -------------------------------------------------
      * cloudrain21
      *  flat 하게 device tree binary 를 tlv 형태로 펼쳐놓은 것을
      *  이제 앞으로 사용하기 좋도록 진짜 tree 형태로 만드는 작업이다.
      *  tree 의 각 node 의 자료구조는 struct device_node 이다.
-     */
+     *----------------------------------------------------*/
 	unflatten_device_tree();
 
 	arm_dt_init_cpu_maps();
