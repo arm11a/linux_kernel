@@ -195,6 +195,10 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
 	struct memblock_region *new_array, *old_array;
 	phys_addr_t old_alloc_size, new_alloc_size;
 	phys_addr_t old_size, new_size, addr;
+
+    /*!!C -------------------------------------------------
+     * slab 할당자가 사용가능한 상태이면 
+     *----------------------------------------------------*/
 	int use_slab = slab_is_available();
 	int *in_slab;
 
@@ -232,6 +236,9 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
 	 * is active for memory hotplug operations
 	 */
 	if (use_slab) {
+        /*!!C -------------------------------------------------
+         * slab 할당자를 사용할 수 있으면 kmalloc 을 통해 메모리 할당 
+         *----------------------------------------------------*/
 		new_array = kmalloc(new_size, GFP_KERNEL);
 		addr = new_array ? __pa(new_array) : 0;
 	} else {
@@ -239,6 +246,9 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
 		if (type != &memblock.reserved)
 			new_area_start = new_area_size = 0;
 
+        /*!!Q -------------------------------------------------
+         * 어디에서 어느 공간을 이용하여 2 배로 닐리는건지 이해못했음.
+         *----------------------------------------------------*/
 		addr = memblock_find_in_range(new_area_start + new_area_size,
 						memblock.current_limit,
 						new_alloc_size, PAGE_SIZE);
@@ -296,6 +306,10 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
  *
  * Scan @type and merge neighboring compatible regions.
  */
+/*!!C -------------------------------------------------
+ * 연속적인 공간이면 region 들을 합침.
+ * -> memblock 에서 관리하는 region array 갯수가 하나 줄어듬.
+ *----------------------------------------------------*/
 static void __init_memblock memblock_merge_regions(struct memblock_type *type)
 {
 	int i = 0;
@@ -314,7 +328,11 @@ static void __init_memblock memblock_merge_regions(struct memblock_type *type)
 		}
 
 		this->size += next->size;
+
 		/* move forward from next + 1, index of which is i + 2 */
+        /*!!C -------------------------------------------------
+         * this 와 next 가 연속적이라면 next 는 없애버림.
+         *----------------------------------------------------*/
 		memmove(next, next + 1, (type->cnt - (i + 2)) * sizeof(*next));
 		type->cnt--;
 	}
@@ -366,6 +384,10 @@ static int __init_memblock memblock_add_region(struct memblock_type *type,
 {
 	bool insert = false;
 	phys_addr_t obase = base;
+
+    /*!!C -------------------------------------------------
+     * base + size 가 ULLONG_MAX 를 넘지 않도록.
+     *----------------------------------------------------*/
 	phys_addr_t end = base + memblock_cap_size(base, &size);
 	int i, nr_new;
 
@@ -387,6 +409,11 @@ repeat:
 	 * then with %true.  The first counts the number of regions needed
 	 * to accomodate the new area.  The second actually inserts them.
 	 */
+    /*!!C -------------------------------------------------
+     * 아래는 2 번을 수행.
+     * 첫번째는 새로운 영역을 추가하기 위해 필요한 region 의
+     * 갯수를 세기 위해(nr_new), 한번은 실제로 region 을 추가하기 위해.
+     *----------------------------------------------------*/
 	base = obase;
 	nr_new = 0;
 
@@ -403,6 +430,9 @@ repeat:
 		 * @rgn overlaps.  If it separates the lower part of new
 		 * area, insert that portion.
 		 */
+        /*!!C -------------------------------------------------
+         * 겹치는 경우 짤라진 앞쪽 부분에 대해 nr_new++ or insert
+         *----------------------------------------------------*/
 		if (rbase > base) {
 			nr_new++;
 			if (insert)
@@ -414,6 +444,9 @@ repeat:
 	}
 
 	/* insert the remaining portion */
+    /*!!C -------------------------------------------------
+     * 겹치는 경우 짤라진 뒷쪽 부분에 대해 nr_new++ or insert
+     *----------------------------------------------------*/
 	if (base < end) {
 		nr_new++;
 		if (insert)
@@ -426,11 +459,19 @@ repeat:
 	 */
 	if (!insert) {
 		while (type->cnt + nr_new > type->max)
+            /*!!C -------------------------------------------------
+             * 추가할 region 숫자를 세어봤더니 이것을 추가할 경우
+             * count 가 max 값을 넘어가게 된다면, memblock 의
+             * region 을 위한 array 를 2 배로 확장한다. 
+             *----------------------------------------------------*/
 			if (memblock_double_array(type, obase, size) < 0)
 				return -ENOMEM;
 		insert = true;
 		goto repeat;
 	} else {
+        /*!!C -------------------------------------------------
+         * 연속적인 region array 는 합쳐버림.
+         *----------------------------------------------------*/
 		memblock_merge_regions(type);
 		return 0;
 	}

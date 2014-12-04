@@ -974,6 +974,8 @@ void __init debug_ll_io_init(void)
  * 2^20 = 1M
  * 240 << 20 은 한마디로 240 M 라는 얘기 
  * 그런데 왜 240 M를 뺐을까 ?
+ *
+ * vmalloc_min = 4080 MB - 240 MB - 8 MB = 3832 MB
  *----------------------------------------------------*/
 static void * __initdata vmalloc_min =
 	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
@@ -1008,13 +1010,18 @@ early_param("vmalloc", early_vmalloc);
 
 phys_addr_t arm_lowmem_limit __initdata = 0;
 
+/*!!C -------------------------------------------------
+ * lowmem, vmalloc(highmem) 등 kernel virtual memory layout 에
+ * 대한 좋은 답변 
+ *  http://unix.stackexchange.com/questions/5124/what-does-the-virtual-kernel-memory-layout-in-dmesg-imply
+ *----------------------------------------------------*/
 void __init sanity_check_meminfo(void)
 {
 	phys_addr_t memblock_limit = 0;
 	int i, j, highmem = 0;
 
     /*!!C -------------------------------------------------
-     * vmalloc_limit = himem 의 시작 
+     * vmalloc_limit = himem 의 시작 ?
      *----------------------------------------------------*/
 	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1;
 
@@ -1037,6 +1044,11 @@ void __init sanity_check_meminfo(void)
 		 * Split those memory banks which are partially overlapping
 		 * the vmalloc area greatly simplifying things later.
 		 */
+        /*!!C -------------------------------------------------
+         * bank start 가 vmalloc_limit 를 넘지 않은 경우라도
+         * bank 의 size 를 고려하면 bank 영역이 highmem 영역으로
+         * 침범이 가능하므로 침범한 것과 아닌 것을 둘로 나눔 
+         *----------------------------------------------------*/
 		if (!highmem && bank->size > size_limit) {
 			if (meminfo.nr_banks >= NR_BANKS) {
 				printk(KERN_CRIT "NR_BANKS too low, "
@@ -1046,6 +1058,11 @@ void __init sanity_check_meminfo(void)
 					(meminfo.nr_banks - i) * sizeof(*bank));
 				meminfo.nr_banks++;
 				i++;
+                /*!!C -------------------------------------------------
+                 * 현재 bank 는 둘로 쪼갠 것 중에서 첫번째를 가리키고
+                 * 있으니 bank[1] 을 하면 쪼갠 것의 두번째 것을 가리킴.
+                 * 즉, highmem 영역의 것에 해당하는 bank.
+                 *----------------------------------------------------*/
 				bank[1].size -= size_limit;
 				bank[1].start = vmalloc_limit;
 				bank[1].highmem = highmem = 1;
@@ -1081,6 +1098,10 @@ void __init sanity_check_meminfo(void)
 		if (!bank->highmem) {
 			phys_addr_t bank_end = bank->start + bank->size;
 
+            /*!!C -------------------------------------------------
+             * 모든 lowmem bank 중에서 가장 end 값이 큰 것을
+             * arm_lowmem_limit 으로 저장.
+             *----------------------------------------------------*/
 			if (bank_end > arm_lowmem_limit)
 				arm_lowmem_limit = bank_end;
 
@@ -1127,6 +1148,15 @@ void __init sanity_check_meminfo(void)
 	}
 #endif
 	meminfo.nr_banks = j;
+
+    /*!!Q -------------------------------------------------
+     * high memory 의 시작지점을 구하는 것 같은데,
+     *  1. 무조건 arm_lowmem_limit 의 다음이 high memory 라고
+     *     정의되는건가 ? 맨 위쪽의 vmalloc_limit 와 다른점은 ?
+     *  2. 왜 -1 을 한 후 +1 을 해주었을까 ? 
+     *
+     * high_memory는 low memory 영역 끝의 가상주소이다.
+     *----------------------------------------------------*/
 	high_memory = __va(arm_lowmem_limit - 1) + 1;
 
 	/*

@@ -1108,6 +1108,7 @@ void __init setup_arch(char **cmdline_p)
      * cloudrain21
      *  커널구조 책에서 mm_struct 에 대한 개념 잠깐 보고 넘어가자.
      *  (mem 자료구조의 연결관계 잠깐 확인)
+     *  include/linux/mm_types.h 파일의 struct mm_struct 주석 참조.
      *  
      *  start_code : text 영역 시작 
      *  end_code   : text 영역 끝 
@@ -1121,6 +1122,11 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.brk	   = (unsigned long) _end;
 
 	/* populate cmd_line too for later use, preserving boot_command_line */
+    /*!!C -------------------------------------------------
+     * 위의 setup_machine_fdt 안에서 dtb 검사하며 저장해둔
+     * boot_command_line 을 동일한 .init.data 영역의 cmd_line
+     * 변수에 복제해둔다.
+     *----------------------------------------------------*/
 	strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
 	*cmdline_p = cmd_line;
 
@@ -1129,6 +1135,7 @@ void __init setup_arch(char **cmdline_p)
      *  boot_command_line 을 parsing 하여 이름과 같은 항목을
      *  kernel_param 또는 .init.setup section 에서 찾아서
      *  value 를 설정해준다.
+     *  early param 에서는 .init.setup section 에만 작업한다.
      *----------------------------------------------------*/
 	parse_early_param();
 
@@ -1137,19 +1144,23 @@ void __init setup_arch(char **cmdline_p)
      *  setup_machine_fdt 내에서 cell 프로퍼티를 분석하여
      *  meminfo 에 저장해둔 bank 정보들의 주소를 서로 비교하여
      *  순서대로 sorting 한다.
-     *  sort 함수의 사용방법 알아두면 좋음.
+     *  sort 류 함수의 사용방법 알아두자. (qsort)
      *----------------------------------------------------*/
 	sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
 
     /*!!C -------------------------------------------------
-     * meminfo 에 저장해둔 bank 의 start, end, highmem 정보를
-     * 검증하고 조정한다.
+     * meminfo 에 저장해둔 각 bank 정보의 start, end, highmem
+     * 정보를 검증하고 조정한다.
      *----------------------------------------------------*/
 	sanity_check_meminfo();
 
     /*!!C -------------------------------------------------
-     * 위에서 meminfo 에 저장해둔 bank 들과, kernel 영역, device tree, dma 등에
-     * 대한 memory block 들을 memblock 자료구조 속에 모두 기록해둔다.
+     * 위에서 meminfo 에 저장해둔 bank 정보들을 memblock 자료구조의
+     * memory region 들로 변경 저장하고,
+     * 그 외에 kernel text, data 영역이나 dma, page table 영역에
+     * 대한 주소와 크기는 memblock 의 reserved region array 에 기록해둔다.
+     * mdesc 의 reserve 함수를 호출하여 plaform 의존적인 memblock
+     * 영역도 reserve 해둔다.
      * 이 memblock 자료구조가 나중에 vm_area_struct 를 할당하고 구성하는데
      * 사용되는건지 어떤건지는 아직 모르겠다.
      *----------------------------------------------------*/

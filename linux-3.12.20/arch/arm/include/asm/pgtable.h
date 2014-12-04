@@ -43,6 +43,7 @@
  */
 /*!!C -------------------------------------------------
  * VMALLOC_START 는 high_memory 위치를 8 MB align 한 자리 
+ * high_memory 의 값은 sanity_check_meminfo 함수에서 구했음.
  *----------------------------------------------------*/
 #define VMALLOC_OFFSET		(8*1024*1024)
 #define VMALLOC_START		(((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))

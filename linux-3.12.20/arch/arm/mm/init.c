@@ -341,15 +341,31 @@ void __init arm_memblock_init(struct meminfo *mi,
 	int i;
 
 	for (i = 0; i < mi->nr_banks; i++)
+        /*!!C -------------------------------------------------
+         * meminfo 의 bank 하나를 memblock 의 memory region 으로 add
+         *----------------------------------------------------*/
 		memblock_add(mi->bank[i].start, mi->bank[i].size);
 
 	/* Register the kernel text, kernel data and initrd with memblock. */
+    /*!!C -------------------------------------------------
+     * kernel 의 text, data, initrd 를 위해 memblock 의
+     * reserved 에 하나의 region 으로 잡는다.
+     *----------------------------------------------------*/
 #ifdef CONFIG_XIP_KERNEL
 	memblock_reserve(__pa(_sdata), _end - _sdata);
 #else
 	memblock_reserve(__pa(_stext), _end - _stext);
 #endif
+
 #ifdef CONFIG_BLK_DEV_INITRD
+    /*!!C -------------------------------------------------
+     * initrd 를 사용하도록 설정되어 있다면 
+     *
+     * phys_initrd_start 와 phys_initrd_size 변수는 
+     * setup_machine_fdt 함수내에서 dtb 를 점검할 때 chosen
+     * 노드를 검사하여 initrd 설정을 검사하여 셋팅했었음.
+     * (early_init_dt_scan_chosen 함수)
+     *----------------------------------------------------*/
 	if (phys_initrd_size &&
 	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
 		pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
@@ -371,10 +387,21 @@ void __init arm_memblock_init(struct meminfo *mi,
 	}
 #endif
 
+    /*!!C -------------------------------------------------
+     * page table 영역을 위해 reserve region
+     *----------------------------------------------------*/
 	arm_mm_memblock_reserve();
+
+    /*!!C -------------------------------------------------
+     * initial_boot_params->off_mem_rsvmap 에 등록되어 있는
+     * base, size 리스트만큼 memblock 의 reserved 에 region 추가함.
+     *----------------------------------------------------*/
 	arm_dt_memblock_reserve();
 
 	/* reserve any platform specific memblock areas */
+    /*!!Q -------------------------------------------------
+     * 이 reserve 함수는 언제 어디서 등록해주는지 모르겠네...
+     *----------------------------------------------------*/
 	if (mdesc->reserve)
 		mdesc->reserve();
 

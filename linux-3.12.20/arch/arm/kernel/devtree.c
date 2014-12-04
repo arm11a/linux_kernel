@@ -180,7 +180,84 @@ bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
  *
  * If a dtb was passed to the kernel in r2, then use it to choose the
  * correct machine_desc and to setup the system.
+ *
+ * dtb 가 r2 레지스터를 통해 kernel 에 전달되면, 해당 dtb 는
+ * 적합한 machine desc 를 선택하여 system 을 초기화하고 셋업하는데 사용된다.
  */
+
+/*!!C -------------------------------------------------
+ * 아래 그림이 dtb binary 의 구조이다.
+ *
+ * dtb base -> +----------------------------+
+ *             |  struct boot_param_header  |
+ *             |     - magic                |
+ *             |     - totalsize            |
+ *             |     - off_dt_sturct -----------+
+ *             |     - off_dt_string --------------+
+ *             |       ...                  |   |  |
+ *             +----------------------------+   |  |
+ *             |      memory reserve map    |   |  |
+ *             +----------------------------+ <-+  |
+ *             |                            |      |
+ *             |  dt struct (tlv)           |      |
+ *             |     - tag (4 byte)         |      |         tag   = 이번 tlv 가 노드의 시작인지, property 인지.. 
+ *             |     - size (4 byte)        |      |         size  = length of value
+ *             |     - noff (4 byte) ------------------+     noff  = start of property name string
+ *             |     - value (size byte)    |      |   |     value = property value
+ *             |                            |      |   |
+ *             |     - tag                  |      |   |
+ *             |     - size                 |      |   |
+ *             |     - noff ------------------------------+
+ *             |     - value                |      |   |  |
+ *             |                            |      |   |  |
+ *             |     ...                    |      |   |  |
+ *             +----------------------------+ <----+   |  |
+ *             |                            |          |  |
+ *             |  dt string                 |          |  |
+ *             |     - key name str 1 <----------------+  |
+ *             |     - key name str 2 <-------------------+
+ *             |     ...                    |
+ *         +-> +----------------------------+
+ *         |
+ *         +-- base + totalsize
+ *
+ * dt struct 부분은 tlv 의 연속이라고 보면 된다.
+ * dt struct 에서 각 요소의 의미는 다음과 같다.
+ *  - tag   = 이번 tlv 가 노드의 시작인지, property 인지, 노드의 끝인지를 나타낸다.
+ *  - size  = value 의 길이 
+ *  - noff  = key string 이 저장된 위치 
+ *  - value = value 값이 저장된다.
+ *
+ * 사용자가 arch/arm/boot/dts 디렉토리의 dts(dtsi) 파일에
+ * 마치 xml 과 같이 시스템 설정들을 해놓으면
+ * dtc 라는 컴파일러를 통해 위와 같은 구조의 dtb binary 가 만들어진다.
+ *
+ * dt struct 의 tag 값은 다음과 같은 것들이 올 수 있다.
+ *   #define OF_DT_BEGIN_NODE	0x1         // 노드의 시작 
+ *   #define OF_DT_END_NODE		0x2         // 노드의 끝 
+ *   #define OF_DT_PROP		    0x3         // property tag
+ *   #define OF_DT_NOP		    0x4         // nothing
+ *
+ * dts 파일을 xml 형태로 생각해보면 쉽다.
+ * 이렇게 xml 형식으로 이해해보면 dtb 에 flat 하게 붙여진 정보들은
+ * 결국 tree 형태로 재구성할 수 있다는 것을 예측할 수 있다.
+ * 모든 노드에는 property 가 있을 수 있고, 하위 노드가 포함될 수 있다.
+ *
+ *   [tag]                      : tag = OF_DT_BEGIN_NODE, root 노드 시작 
+ *       "/"                    : root 노드의 path(key)는 "/"
+ *       [tag]                  : tag = OF_DT_PROP, root 노드의 property 
+ *           "samsung,smdk5420" : property value     
+ *       [tag]                  : tag = OF_DT_BEGIN_NODE, 하위노드의 시작  
+ *           "memory"           : 하위노드의 path 는 "memory"
+ *           [tag]              : tag = OF_DT_PROP, property value tag
+ *               "prop value"
+ *           [tag]              : tag = OF_DT_PROP, property value tag
+ *               "prop value"
+ *           [tag]              : tag = OF_DT_PROP, property value tag
+ *               "prop value"
+ *       [/tag]                 : tag = OF_DT_END_NODE, 하위노드 끝 
+ *   [/tag]                     : tag = OF_DT_END_NODE, root 노드 끝 
+ *----------------------------------------------------*/
 const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 {
 	struct boot_param_header *devtree;
@@ -269,10 +346,26 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
      * 해당 node 의 property 들 중 원하는 것을 찾아서 초기화 작업에 이용하게 된다.
      *----------------------------------------------------*/
 	/* Retrieve various information from the /chosen node */
+    /*!!C -------------------------------------------------
+     * early_init_dt_scan_chosen 함수에서 chosen 노드일 경우
+     * bootargs 프로퍼티의 value 를 .init.data section 을
+     * 사용하는 boot_command_line 변수에 저장해준다.
+     *----------------------------------------------------*/
 	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
+
 	/* Initialize {size,address}-cells info */
+    /*!!C -------------------------------------------------
+     * cell size 와 addr 를 얻어서 dt_root_size_cells 와
+     * dt_root_addr_cells 에 저장한다.
+     *----------------------------------------------------*/
 	of_scan_flat_dt(early_init_dt_scan_root, NULL);
+
 	/* Setup memory, calling early_init_dt_add_memory_arch */
+    /*!!C -------------------------------------------------
+     * 위에서 얻은 cell 정보와 memory 노드 등의 정보를 이용하여
+     * struct meminfo 자료구조를 채운다.
+     * meminfo 를 보면 memory bank 들의 크기와 위치를 알 수 있게 된다.
+     *----------------------------------------------------*/
 	of_scan_flat_dt(early_init_dt_scan_memory, NULL);
 
 	/* Change machine number to match the mdesc we're using */
