@@ -499,10 +499,10 @@ asmlinkage void __init start_kernel(void)
 	 * Need to run as early as possible, to initialize the
 	 * lockdep hash:
 	 */
-    /*!!C
+    /*!!C -------------------------------------------------
      * CONFIG_LOCKDEP 설정이 안되어 있으므로 아무것도 안함. 
      * Debug 에서만 사용하고 Lock 간의 의존성 검사를 위해 사용한다고 함.
-     */
+     *----------------------------------------------------*/
 	lockdep_init();
 
 	smp_setup_processor_id();
@@ -511,7 +511,7 @@ asmlinkage void __init start_kernel(void)
 	/*
 	 * Set up the the initial canary ASAP:
 	 */
-    /*!!C
+    /*!!C -------------------------------------------------
      * cloudrain21 추가 
      * 
      * random 수(canary value)를 획득하여 current task 의
@@ -521,10 +521,10 @@ asmlinkage void __init start_kernel(void)
      * stackprotector.h 파일의 comment 에 있듯이 ARM 에서는 
      * global 변수를 사용하므로 아쉽게도 task 별로 다른 값을
      * 가질 수 없는 상태이다.
-     */
+     *----------------------------------------------------*/
 	boot_init_stack_canary();
 
-    /*!!C
+    /*!!C -------------------------------------------------
      * cloudrain21 추가 
      *
      * 프로세스들을 group 화하여 자원을 분배하거나 제어하기 위해
@@ -532,17 +532,17 @@ asmlinkage void __init start_kernel(void)
      * cgroup 에 대한 초기화는 cgroup_init_early 와 cgroup_init 에서
      * 두번에 나누어 진행되는데, 이는 부팅 초반에 사용되는 서브시스템이
      * 미리 초기화되어야 하기 때문이다.
-     */
+     *----------------------------------------------------*/
 	cgroup_init_early();
 
-    /*!!C
+    /*!!C -------------------------------------------------
      * cloudrain21 추가 
      * 
      * 현재 부팅을 수행하는 CPU 의 IRQ 를 비활성화한다.
      * 아직 인터럽트 소스와 벡터테이블, 핸들러가 초기화되지 않았으므로
      * 인터럽트를 꺼야 한다.
      * cpsr 의 I 비트를 설정하면 된다.
-     */
+     *----------------------------------------------------*/
 	local_irq_disable();
 	early_boot_irqs_disabled = true;
 
@@ -551,7 +551,7 @@ asmlinkage void __init start_kernel(void)
  * enable them
  */
 
-    /*!!C
+    /*!!C -------------------------------------------------
      * cloudrain21 추가 
      *
      * 현재 태스크가 사용중인 CPU 를 thread_info->cpu 에서
@@ -561,27 +561,27 @@ asmlinkage void __init start_kernel(void)
      * 특정 CPU 가 offline 이 되거나 하면 task 쪽으로 event 가
      * 발생하여 event 처리과정 중에 __cpu_disable() 을 호출하면서
      * 해당 cpu 가 online bitmap 에서 빠지게 되어 offline 상태가 된다.
-     */
+     *----------------------------------------------------*/
 	boot_cpu_init();
 
-    /*!!C
+    /*!!C -------------------------------------------------
      * cloudrain21 추가 
      *
      * 메모리 직접 매핑 지역인 896 M 이내를 넘어가는 HIGHMEM 영역을
      * 관리하기 위한 자료구조를 초기화한다.
      * HIGHMEM 중 할당된 메모리를 page_address_htable 로 관리한다.
      * 자료구조 그림은 모기향책 148 page 참조.
-     */
+     *----------------------------------------------------*/
 	page_address_init();
 	pr_notice("%s", linux_banner);
 
-    /*!!C
+    /*!!C -------------------------------------------------
      * setup_arch 진행중...
      * 끝나면 위쪽처럼 여기에 comment 정리할 것.
      * 
      * 참고로 초기화 과정에서 설정되는 global 변수들은 대부분
      * __initdata 즉 .init.data section 에 모아둔다는 것을 명심하자.
-     */
+     *----------------------------------------------------*/
 	setup_arch(&command_line);
 	mm_init_owner(&init_mm, &init_task);
 	mm_init_cpumask(&init_mm);
