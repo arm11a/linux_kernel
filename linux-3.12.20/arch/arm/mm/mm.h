@@ -33,6 +33,11 @@ static inline pte_t get_top_pte(unsigned long va)
 
 static inline pmd_t *pmd_off_k(unsigned long virt)
 {
+    /*!!C -------------------------------------------------
+     * pgd_offset_k(virt) : virt 주소 영역을 가리키는 page directory entry offset
+     * pud_offset         : 하는일 없음 (4-level 에서 사용)
+     * pmd_offset         : 하는일 없음 (3-level 에서 사용)
+     *----------------------------------------------------*/
 	return pmd_offset(pud_offset(pgd_offset_k(virt), virt), virt);
 }
 

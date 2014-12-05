@@ -32,7 +32,7 @@
 
 #ifdef CONFIG_MMU
 
-/*
+/*!!C
  * PAGE_OFFSET - the virtual address of the start of the kernel image
  * TASK_SIZE - the maximum size of a user space task.
  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
@@ -50,6 +50,13 @@
  * The module space lives between the addresses given by TASK_SIZE
  * and PAGE_OFFSET - it must be within 32MB of the kernel text.
  */
+/*!!C -------------------------------------------------
+ * PAGE_OFFSET - the virtual address of the start of the kernel image
+ *
+ * 참고 
+ * -DTEXT_OFFSET=0x00008000
+ *  TEXT_OFFSET은 kernel/head.S의 컴파일 옵션으로 들어감.
+ *----------------------------------------------------*/
 #ifndef CONFIG_THUMB2_KERNEL
 #define MODULES_VADDR		(PAGE_OFFSET - SZ_16M)
 #else

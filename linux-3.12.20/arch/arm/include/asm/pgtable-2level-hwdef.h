@@ -10,6 +10,37 @@
 #ifndef _ASM_PGTABLE_2LEVEL_HWDEF_H
 #define _ASM_PGTABLE_2LEVEL_HWDEF_H
 
+/*!!C-----------------------------------------------------------------
+ *
+ * Page Table (ARM Reference Manual 및 recipes 블로그 MMU 참조)
+ *    - www.iamroot.org/xe/Kernel_10_ARM/176798
+ *    - recipes.egloos.com/5232056
+ *
+ *                 Level 1               Level 2 
+ *   TTBR -> +------------------+
+ *           | Section Entry  10|-------------------------> 1m memory region
+ *           +------------------+
+ *           | Coarse Page    01|---> Coarse Page Table --> Large(64k), Small(4k) Page
+ *           +------------------+
+ *           | Fine Page      11|---> Fine Page Table  ---> Large(64k), Small(4k), Tiny(1k) Page
+ *           +------------------+
+ *           | Fault          00|---> Invalid
+ *           +------------------+
+ *           |      ...         |
+ *           +------------------+
+ *                4096 entry
+ *          (4 byte * 4096 = 16k)
+ *
+ *   Level 1 Page Table Entry 의 마지막 2 비트를 보고 해당 Entry 가 
+ *   section 또는 large, small page 중 어떤 것을 가리킬지 결정한다.
+ *   Level 2 Page Table Entry 에서도 마지막 2 비트를 통해 Large, Small, Tiny
+ *   중 어떤 것을 가리킬지 결정된다.
+ *
+ *   cf> ARM reference manual 을 보면 supersection (16m)도 있는데 이는 option 이다.
+ *       32bit 이상의 물리주소를 지원한다면 이를 모두 접근하려면 supersection 을
+ *       지원해야 한다.
+ -------------------------------------------------------------------*/
+
 /*
  * Hardware page table definitions.
  *

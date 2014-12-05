@@ -747,6 +747,13 @@ ENDPROC(__fixup_smp)
 	.word	__smpalt_begin
 	.word	__smpalt_end
 
+    /*!!C -------------------------------------------------
+     * CONFIG_SMP 가 설정되어 있고, smp 환경이면 .data 영역에
+     * .long 1 이 저장된다. 아니면 당연히 .long 0
+     *
+     * ALT_SMP, ALT_UP 에 대한 이해는 아래 URL 참조.
+     * http://stackcanary.com/?p=622 
+     *----------------------------------------------------*/
 	.pushsection .data
 	.globl	smp_on_up
 smp_on_up:

@@ -232,6 +232,9 @@ __setup("noalign", noalign_setup);
 #define PROT_PTE_S2_DEVICE	PROT_PTE_DEVICE
 #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
 
+/*!!Q-----------------------------------------------------------------
+ * mem_type 자료구조의 각 변수가 무엇을 의미하는지 정확히 모르겠네.
+ -------------------------------------------------------------------*/
 static struct mem_type mem_types[] = {
 	[MT_DEVICE] = {		  /* Strongly ordered / ARMv6 shared device */
 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_SHARED |
@@ -342,6 +345,17 @@ EXPORT_SYMBOL(get_mem_type);
 /*
  * Adjust the PMD section entries according to the CPU in use.
  */
+/*!!C -------------------------------------------------
+ * mem_type 이라는 것이 결국 memory 영역이 이용될 수 있는 
+ * 다양한 type 에 대한 성질이나 특성들을 설정해놓은 자료구조이다.
+ * 이러한 자료구조는 Memory 영역을 가리키는 Page Table Entry 의
+ * 설정값들을 결정하게 된다.
+ * (이전에 보았듯이 Page Table Entry 에는 AP, Bufferable, 
+ *  Domain, Cacheable 등 bit 단위로 메모리의 특징이 설정되어 있다.)
+ * build_mem_type_table 함수에서는 이러한 Entry 의 값들로
+ * 사용될 mem_type 의 자료구조 설정들을 현재 사용하는 
+ * CPU 를 고려하여 조정해주는 역할을 수행한다.
+ *----------------------------------------------------*/
 static void __init build_mem_type_table(void)
 {
 	struct cachepolicy *cp;
@@ -365,6 +379,34 @@ static void __init build_mem_type_table(void)
 			cachepolicy = CPOLICY_WRITEBACK;
 		ecc_mask = 0;
 	}
+
+    /*!!C -------------------------------------------------
+     * write allocation 이 추가되면서 기존의
+     * CPOLICY_WRITEBACK 은 Write-Back cache with No-Write Allocation 의 의미로,
+     * CPOLICY_WRITEALLOC 은 Write-Back cache with Write Allocation 의미로 사용됨
+     *
+     *  - write allocate 방식
+     *    write miss 가 발생했을 때, 우선 메인메모리로부터
+     *    해당 block을 fetch 하여 cache 내의 block 에 allocate 한다.
+     *    그러면, write hit 가 가능해지는데 write hit 에 의하여
+     *    cache 내 해당 block 에 write 를 수행한다.
+     *    그리고, 또 다른 miss 가 발생했을 때 modified 된 block 은
+     *    write buffer 에 write 된다.
+     *  - write miss 가 발생했을 때, 우선 write buffer 에 write 한다.
+     *    그 후, write buffer 에 write 된 데이터는 메인메모리에
+     *    write 를 수행한다. (메인메모리로부터 해당 block 을
+     *    fetch 하여 cache 내의 block 에 allocate 를 수행하지 않는다)
+     *
+     * https://www.google.co.kr/url?sa=t&rct=j&q=&esrc=s&source=web&cd=2&    \
+     *   ved=0CCwQFjAB&url=http%3A%2F%2Fmpu.yonsei.ac.kr%2Fxe%2F%3Fmodule%   \
+     *   3Dfile%26act%3DprocFileDownload%26file_srl%3D11170%26sid%           \
+     *   3Dee4ab3e31f204e2a7804a59e9ce68727&ei=kCyBVLjcIdfZ8gXcwIHwDQ&       \
+     *   usg=AFQjCNHnxCTS23ucZARkdTCDhJG_FFdQug&sig2=y74iWbEaH8O4IaDlQQ9_cw& \
+     *   bvm=bv.80642063,bs.1,d.dGc&cad=rjt
+     *
+     * smp 일 때 왜 cachepolicy 를 write allocate 로 사용하는지.
+     *   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/260008.html
+     *----------------------------------------------------*/
 	if (is_smp())
 		cachepolicy = CPOLICY_WRITEALLOC;
 
@@ -373,6 +415,11 @@ static void __init build_mem_type_table(void)
 	 * Pre-ARMv5 CPUs don't have TEX bits.  Pre-ARMv6 CPUs or those
 	 * without extended page tables don't have the 'Shared' bit.
 	 */
+    /*!!C -------------------------------------------------
+     * 버전이 낮은 architecture 들에 대해 지원안되는 기능등을
+     * 가리키는 bit 는 빼버림.
+     * ARRAY_SIZE 매크로 유용할 듯...
+     *----------------------------------------------------*/
 	if (cpu_arch < CPU_ARCH_ARMv5)
 		for (i = 0; i < ARRAY_SIZE(mem_types); i++)
 			mem_types[i].prot_sect &= ~PMD_SECT_TEX(7);
@@ -976,6 +1023,10 @@ void __init debug_ll_io_init(void)
  * 그런데 왜 240 M를 뺐을까 ?
  *
  * vmalloc_min = 4080 MB - 240 MB - 8 MB = 3832 MB
+ * VMALLOC_END = 0xff000000
+ * VMALLOC_OFFSET = 0x800000
+ * 0xff000000 - 0xf0000000 - 0x800000 = 0xef800000
+ * vmalloc_min = 0xef800000
  *----------------------------------------------------*/
 static void * __initdata vmalloc_min =
 	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
@@ -1014,6 +1065,9 @@ phys_addr_t arm_lowmem_limit __initdata = 0;
  * lowmem, vmalloc(highmem) 등 kernel virtual memory layout 에
  * 대한 좋은 답변 
  *  http://unix.stackexchange.com/questions/5124/what-does-the-virtual-kernel-memory-layout-in-dmesg-imply
+ *
+ * OB 들 분석 자료 굿
+ *  https://github.com/iamroot-arm10b/linux/blob/master/arch/arm/mm/mmu.c
  *----------------------------------------------------*/
 void __init sanity_check_meminfo(void)
 {
@@ -1021,10 +1075,19 @@ void __init sanity_check_meminfo(void)
 	int i, j, highmem = 0;
 
     /*!!C -------------------------------------------------
-     * vmalloc_limit = himem 의 시작 ?
+     * vmalloc_limit = himem 의 시작
+     * vmalloc_min = 0xEF800000 : highmem의 시작주소에서 8M 만큼 뺀 주소
+     * pa(vmalloc_min -1)+1 = 0x4F800000
+     * vmalloc_limit = 0x4F800000
      *----------------------------------------------------*/
 	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1;
 
+    /*!!C -------------------------------------------------
+     * dtb 설정에 의해 meminfo
+     * nr_bank = 1
+     * 0x20000000 start (addr)
+     * 0x80000000 size
+     *----------------------------------------------------*/
 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
 		struct membank *bank = &meminfo.bank[j];
 		phys_addr_t size_limit;
@@ -1032,6 +1095,9 @@ void __init sanity_check_meminfo(void)
 		*bank = meminfo.bank[i];
 		size_limit = bank->size;
 
+        /*!!C -------------------------------------------------
+         * vmalloc_limit는 물리메모리상의 vmalloc 상한선을 나타낸다.
+         *----------------------------------------------------*/
 		if (bank->start >= vmalloc_limit)
 			highmem = 1;
 		else
@@ -1172,6 +1238,10 @@ void __init sanity_check_meminfo(void)
 	memblock_set_current_limit(memblock_limit);
 }
 
+/*!!C -------------------------------------------------
+ * 아래 파일의 맨 위쪽 개발자 주석 참조.
+ * arch/arm/include/asm/pgtable-2level.h
+ *----------------------------------------------------*/
 static inline void prepare_page_table(void)
 {
 	unsigned long addr;
@@ -1180,6 +1250,16 @@ static inline void prepare_page_table(void)
 	/*
 	 * Clear out all the mappings below the kernel image.
 	 */
+    /*!!C -------------------------------------------------
+     * Virtual Address 0 ~ MODULES_VADDR까지 영역에 대한
+     * 페이지테이블 영역 Clear 
+     * kernel 아래 부분에 대한 clear 이다.
+     * MODULES_VADDR = PAGE_OFFSET - SZ_8M
+     *
+     * 8 byte 씩 clear 한다.
+     *  - 4 byte 2 개를 0 으로 설정하고,
+     *  - tlb flush operation 을 수행한다.
+     *----------------------------------------------------*/
 	for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)
 		pmd_clear(pmd_off_k(addr));
 
@@ -1187,12 +1267,21 @@ static inline void prepare_page_table(void)
 	/* The XIP kernel is mapped in the module area -- skip over it */
 	addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
 #endif
+
+    /*!!C -------------------------------------------------
+     * MODULES_VADDR ~ PAGE_OFFSET 영역에 대한 페이지테이블 영역 Clear
+     * 즉, module space 에 대한 clear
+     *----------------------------------------------------*/
 	for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
 		pmd_clear(pmd_off_k(addr));
 
 	/*
 	 * Find the end of the first block of lowmem.
 	 */
+    /*!!C -------------------------------------------------
+     * sanity_check_meminfo() 함수에서 모든 lowmem bank 중
+     * 가장 end 값이 큰 것을 arm_lowmem_limit 으로 저장했었음.
+     *----------------------------------------------------*/
 	end = memblock.memory.regions[0].base + memblock.memory.regions[0].size;
 	if (end >= arm_lowmem_limit)
 		end = arm_lowmem_limit;
@@ -1201,6 +1290,10 @@ static inline void prepare_page_table(void)
 	 * Clear out all the kernel space mappings, except for the first
 	 * memory bank, up to the vmalloc region.
 	 */
+    /*!!C -------------------------------------------------
+     * low memory ~ high memory gap 영역(최대 8 M)에 대한 clear
+     * 왜냐하면 VMALLOC_START 는 8 M align 한 자리이므로.
+     *----------------------------------------------------*/
 	for (addr = __phys_to_virt(end);
 	     addr < VMALLOC_START; addr += PMD_SIZE)
 		pmd_clear(pmd_off_k(addr));
@@ -1361,6 +1454,10 @@ static void __init map_lowmem(void)
 		if (start >= end)
 			break;
 
+        /*!!C -------------------------------------------------
+         * pfn = page frame number
+         *     = physical addr >> PAGE_SHIFT (4k)
+         *----------------------------------------------------*/
 		map.pfn = __phys_to_pfn(start);
 		map.virtual = __phys_to_virt(start);
 		map.length = end - start;
@@ -1378,8 +1475,18 @@ void __init paging_init(const struct machine_desc *mdesc)
 {
 	void *zero_page;
 
+    /*!!C -------------------------------------------------
+     * memory 의 type 별로 특성들을 설정해두는 mem_type 
+     * 자료구조의 값들을 현재 사용하는 cpu 에 맞게 조정해준다.
+     *----------------------------------------------------*/
 	build_mem_type_table();
+
+    /*!!C -------------------------------------------------
+     * 현재 초기화되지 않은 page table entry 초기화
+     * user 영역(3064 M), module 영역(8 M), VMALLOC gap (8 M)
+     *----------------------------------------------------*/
 	prepare_page_table();
+
 	map_lowmem();
 	dma_contiguous_remap();
 	devicemaps_init(mdesc);

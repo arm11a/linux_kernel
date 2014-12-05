@@ -44,6 +44,7 @@
 /*!!C -------------------------------------------------
  * VMALLOC_START 는 high_memory 위치를 8 MB align 한 자리 
  * high_memory 의 값은 sanity_check_meminfo 함수에서 구했음.
+ * high_memory 값은 low memory 의 끝에 대한 가상주소임.
  *----------------------------------------------------*/
 #define VMALLOC_OFFSET		(8*1024*1024)
 #define VMALLOC_START		(((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
@@ -183,6 +184,11 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 #define pgd_offset(mm, addr)	((mm)->pgd + pgd_index(addr))
 
 /* to find an entry in a kernel page-table-directory */
+/*!!C -------------------------------------------------
+ * mm_struct 에서 pgd 변수가 swapper_pg_dir 를 가리키는데
+ * addr 가 가리키는 메모리에 대한 entry 가 몇번째인지를 계산.
+ * (2 MB 단위로 몇번째 인지를 계산하면 됨)
+ *----------------------------------------------------*/
 #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
 
 #define pmd_none(pmd)		(!pmd_val(pmd))

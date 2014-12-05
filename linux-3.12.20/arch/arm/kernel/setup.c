@@ -261,6 +261,10 @@ static int __get_cpu_architecture(void)
 
 int __pure cpu_architecture(void)
 {
+    /*!!C -------------------------------------------------
+     * __cpu_architecture 는 setup_arch()의
+     * setup_processor() 함수에서 설정하였음.
+     *----------------------------------------------------*/
 	BUG_ON(__cpu_architecture == CPU_ARCH_UNKNOWN);
 
 	return __cpu_architecture;
@@ -1151,6 +1155,8 @@ void __init setup_arch(char **cmdline_p)
     /*!!C -------------------------------------------------
      * meminfo 에 저장해둔 각 bank 정보의 start, end, highmem
      * 정보를 검증하고 조정한다.
+     * bank 에 등록된 주소와 크기를 고려할 때 highmem 영역인
+     * 것과 아닌 것을 구분하여 bank 조정분리 작업을 수행한다.
      *----------------------------------------------------*/
 	sanity_check_meminfo();
 

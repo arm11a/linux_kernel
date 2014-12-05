@@ -30,6 +30,25 @@ struct pt_regs;
    result (of value 0 and type size_t), so the expression can be used
    e.g. in a structure initializer (or where-ever else comma expressions
    aren't permitted). */
+
+/*!!C -------------------------------------------------
+ * http://stackoverflow.com/questions/9229601/what-is-in-c-code
+ *
+ * e 가 0 이면 int:0 이 되어 정상 : sizeof() 결과는 0 
+ * e 가 0 이 아니면 int:-1 이 되어 compile 시 에러발생 
+ *
+ * 아래 sample 을 컴파일하면...
+ *
+ * #define BUILD_BUG_ON_ZERO(e) (sizeof(struct { int:-!!(e); }))
+ * int main()
+ * {
+ *    printf("%d\n", (int)BUILD_BUG_ON_ZERO(1));
+ * }
+ *
+ * 다음과 같이 에러가 발생.
+ * x.c: In function ‘main’:
+ * x.c:7:25: error: negative width in bit-field ‘<anonymous>’
+ *----------------------------------------------------*/
 #define BUILD_BUG_ON_ZERO(e) (sizeof(struct { int:-!!(e); }))
 #define BUILD_BUG_ON_NULL(e) ((void *)sizeof(struct { int:-!!(e); }))
 

@@ -18,6 +18,10 @@ static inline bool is_smp(void)
 #ifndef CONFIG_SMP
 	return false;
 #elif defined(CONFIG_SMP_ON_UP)
+    /*!!C -------------------------------------------------
+     * arch/arm/kernel/head.S 에 smp_on_up 변수가 global 로
+     * 선언되어 있다.
+     *----------------------------------------------------*/
 	extern unsigned int smp_on_up;
     /*!!C
      * smp_on_up 값이 1 보다 크더라도 결국은 1 이 된다.
