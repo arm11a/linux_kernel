@@ -174,6 +174,10 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
 	do {				\
 		pmdp[0] = __pmd(0);	\
 		pmdp[1] = __pmd(0);	\
+        /*!!C -------------------------------------------------
+         * page directory 의 값이 변경되면 메모리에 반영해야 한다.
+         * 이를 위해 pmdp 에 해당하는 MMU 의 D-Cache 라인을 clean 시킨다.
+         *----------------------------------------------------*/
 		clean_pmd_entry(pmdp);	\
 	} while (0)
 

@@ -233,7 +233,10 @@ __setup("noalign", noalign_setup);
 #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
 
 /*!!Q-----------------------------------------------------------------
- * mem_type 자료구조의 각 변수가 무엇을 의미하는지 정확히 모르겠네.
+ * MT_DEVICE, MT_DEVICE_NONSHARED 등 메모리가 사용되는 목적에 맞는
+ * 타입이 결정되고 각 타입별로 필요한 속성들이 mem_type 자료구조에
+ * 설정된다.
+ * mem_type 자료구조의 각 변수와 속성이 무엇을 의미하는지 정확히 모르겠네.
  -------------------------------------------------------------------*/
 static struct mem_type mem_types[] = {
 	[MT_DEVICE] = {		  /* Strongly ordered / ARMv6 shared device */
@@ -347,7 +350,7 @@ EXPORT_SYMBOL(get_mem_type);
  */
 /*!!C -------------------------------------------------
  * mem_type 이라는 것이 결국 memory 영역이 이용될 수 있는 
- * 다양한 type 에 대한 성질이나 특성들을 설정해놓은 자료구조이다.
+ * 다양한 type 에 대한 성질이나 속성들을 설정해놓은 자료구조이다.
  * 이러한 자료구조는 Memory 영역을 가리키는 Page Table Entry 의
  * 설정값들을 결정하게 된다.
  * (이전에 보았듯이 Page Table Entry 에는 AP, Bufferable, 
@@ -355,10 +358,17 @@ EXPORT_SYMBOL(get_mem_type);
  * build_mem_type_table 함수에서는 이러한 Entry 의 값들로
  * 사용될 mem_type 의 자료구조 설정들을 현재 사용하는 
  * CPU 를 고려하여 조정해주는 역할을 수행한다.
+ *
+ * 아래 함수는 길어보이지만 결국은 섹션(Section or L1 or PMD), 
+ * 테이블 엔트리(L2 or PTE), 그리고 도메인에 대한 보호설정을
+ * 해주는 것이 전부이다.
  *----------------------------------------------------*/
 static void __init build_mem_type_table(void)
 {
 	struct cachepolicy *cp;
+    /*!!C -------------------------------------------------
+     * 컨트롤 레지스터의 값을 읽어온다.
+     *----------------------------------------------------*/
 	unsigned int cr = get_cr();
 	pteval_t user_pgprot, kern_pgprot, vecs_pgprot;
 	pteval_t hyp_device_pgprot, s2_pgprot, s2_device_pgprot;
@@ -740,6 +750,9 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
 				  unsigned long end, phys_addr_t phys,
 				  const struct mem_type *type)
 {
+    /*!!C -------------------------------------------------
+     * 2-level 에서는 pud = pmd = pgd
+     *----------------------------------------------------*/
 	pud_t *pud = pud_offset(pgd, addr);
 	unsigned long next;
 
@@ -826,6 +839,10 @@ static void __init create_mapping(struct map_desc *md)
 	const struct mem_type *type;
 	pgd_t *pgd;
 
+    /*!!C -------------------------------------------------
+     * md 가 가리키는 메모리가 vector table 도 아니면서
+     * user task space 영역일 경우에는 mapping 을 하지 않는다.
+     *----------------------------------------------------*/
 	if (md->virtual != vectors_base() && md->virtual < TASK_SIZE) {
 		printk(KERN_WARNING "BUG: not creating mapping for 0x%08llx"
 		       " at 0x%08lx in user region\n",
@@ -833,6 +850,10 @@ static void __init create_mapping(struct map_desc *md)
 		return;
 	}
 
+    /*!!C -------------------------------------------------
+     * ROM 이나 DEVICE 메모리 타입일 경우에는 vmalloc 영역을
+     * 벗어난 영역에 대해서는 mapping 을 원래 못하는데...
+     *----------------------------------------------------*/
 	if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
 	    md->virtual >= PAGE_OFFSET &&
 	    (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) {
@@ -853,10 +874,21 @@ static void __init create_mapping(struct map_desc *md)
 	}
 #endif
 
+    /*!!C -------------------------------------------------
+     * addr = 4 k 단위로 짤라낸 가상주소 
+     * phys = 4 k 단위로 짤라낸 물리주소 
+     *----------------------------------------------------*/
 	addr = md->virtual & PAGE_MASK;
 	phys = __pfn_to_phys(md->pfn);
+
+    /*!!C -------------------------------------------------
+     * md->lenght 를 page 크기(4k) 단위로 align
+     *----------------------------------------------------*/
 	length = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
 
+    /*!!Q -------------------------------------------------
+     * 이건 뭐하자는건지 모르겠네...
+     *----------------------------------------------------*/
 	if (type->prot_l1 == 0 && ((addr | phys | length) & ~SECTION_MASK)) {
 		printk(KERN_WARNING "BUG: map for 0x%08llx at 0x%08lx can not "
 		       "be mapped using pages, ignoring.\n",
@@ -864,14 +896,32 @@ static void __init create_mapping(struct map_desc *md)
 		return;
 	}
 
+    /*!!Q -------------------------------------------------
+     * 인자로 넘어온 memory 영역을 cover 하는 pgd entry 들을
+     * 구하려면 일단 시작 주소에 해당하는 pgd entry 를 구해야지. -> pgd
+     * (인자로 넘어온 memory 영역은 여러개의 pgd entry 가
+     *  필요할 수 있음.)
+     *----------------------------------------------------*/
 	pgd = pgd_offset_k(addr);
+
+    /*!!C -------------------------------------------------
+     * 4 k align 된 시작주소에다 4 k align 된 length 를 더해서
+     * 인자 메모리 덩어리의 끝(end)을 구함.
+     *----------------------------------------------------*/
 	end = addr + length;
 	do {
+        /*!!C -------------------------------------------------
+         * next = 이번꺼 다음의 2 MB 단위의 다음 boundary 주소 
+         *----------------------------------------------------*/
 		unsigned long next = pgd_addr_end(addr, end);
 
 		alloc_init_pud(pgd, addr, next, phys, type);
 
+        /*!!C -------------------------------------------------
+         * 물리주소에도 2 MB 를 더해준다.
+         *----------------------------------------------------*/
 		phys += next - addr;
+
 		addr = next;
 	} while (pgd++, addr != end);
 }
@@ -1241,6 +1291,8 @@ void __init sanity_check_meminfo(void)
 /*!!C -------------------------------------------------
  * 아래 파일의 맨 위쪽 개발자 주석 참조.
  * arch/arm/include/asm/pgtable-2level.h
+ *
+ * pmd = pgd = L1 page table
  *----------------------------------------------------*/
 static inline void prepare_page_table(void)
 {
@@ -1254,6 +1306,7 @@ static inline void prepare_page_table(void)
      * Virtual Address 0 ~ MODULES_VADDR까지 영역에 대한
      * 페이지테이블 영역 Clear 
      * kernel 아래 부분에 대한 clear 이다.
+     * PAGE_OFFSET - the virtual address of the start of the kernel image
      * MODULES_VADDR = PAGE_OFFSET - SZ_8M
      *
      * 8 byte 씩 clear 한다.
@@ -1444,6 +1497,10 @@ static void __init map_lowmem(void)
 	struct memblock_region *reg;
 
 	/* Map all the lowmem memory banks. */
+    /*!!C -------------------------------------------------
+     * lowmem 영역에 해당하는 memory region 들에 대해 
+     * 돌아가면서 create_mapping 수행 
+     *----------------------------------------------------*/
 	for_each_memblock(memory, reg) {
 		phys_addr_t start = reg->base;
 		phys_addr_t end = start + reg->size;
@@ -1476,17 +1533,46 @@ void __init paging_init(const struct machine_desc *mdesc)
 	void *zero_page;
 
     /*!!C -------------------------------------------------
-     * memory 의 type 별로 특성들을 설정해두는 mem_type 
+     * 커널이 메모리를 사용하는 모든 용례를 분류화하여 
+     * 메모리 타입을 정의하였는데, 이러한 메모리 타입 별로 
+     * 속성정보를 저장하고 있는 자료구조가 mem_type 이다.
+     * memory 의 type 별로 속성들을 설정해두는 mem_type 
      * 자료구조의 값들을 현재 사용하는 cpu 에 맞게 조정해준다.
      *----------------------------------------------------*/
 	build_mem_type_table();
 
     /*!!C -------------------------------------------------
-     * 현재 초기화되지 않은 page table entry 초기화
+     * 현재 초기화되지 않은 pgd(pmd) entry 초기화
      * user 영역(3064 M), module 영역(8 M), VMALLOC gap (8 M)
+     *
+     * 모기향책 205, 210 page 의 그림 참조.
+     *
+     * 원래 3-level paging 에서는 entry 가 다음과 같다.
+     *
+     * +------------+-----------+----------+------------+
+     * |   pgd      |    pmd    |   pte    |   offset   |
+     * +------------+-----------+----------+------------+
+     *              |           |          |<---------->|
+     *              |           |            PAGE_SHIFT |
+     *              |           |<--------------------->|
+     *              |                PMD_SHIFT          |
+     *              |<--------------------------------->|
+     *                  PGDIR_SHIFT
+     *
+     * ARM 에서는 2-level paging 을 사용하므로 (pgd = pmd)
+     *
+     * +----------------+--------------+----------------+
+     * |   pgd = pmd    |     pte      |    offset      |
+     * +----------------+--------------+----------------+
+     *    11 bit [31:21]  9 bit [20:12]   12 bit [11:0]
+     *    2048 entry      512 entry
      *----------------------------------------------------*/
 	prepare_page_table();
 
+    /*!!C -------------------------------------------------
+     * memblock 의 모든 region 중에서 lowmem 에 해당하는
+     * region 만 
+     *----------------------------------------------------*/
 	map_lowmem();
 	dma_contiguous_remap();
 	devicemaps_init(mdesc);
