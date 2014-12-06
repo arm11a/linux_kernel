@@ -57,8 +57,8 @@
  * 
  * 1. __section : start_kernel 의 section 지정 
  * 2. cold ??
- * 3. notrace : profiling 막는다. -> 유덕씨가 start_kernel 에서 breakpoint 가 안걸린다더라.
- *                                -> 그럼 notrace 빼고 해봐라.
+ * 3. notrace : profiling 막는다. -> 유덕씨가 start_kernel 에서 breakpoint 가 안걸린다더라. -> 아닌 걸로 판정 -> 후기에 자세히 적혀있음 e4deen.wordpress.com
+ *                                -> 그럼 notrace 빼고 해봐라. -> 할 필요 없더라.
  -------------------------------------------------------------------*/
 #define __init		__section(.init.text) __cold notrace
 #define __initdata	__section(.init.data)

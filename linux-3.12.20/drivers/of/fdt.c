@@ -750,9 +750,11 @@ int __init early_init_dt_scan_root(unsigned long node, const char *uname,
 	return 1;
 }
 
+/*!!C next cell의 value를 읽어들임? */
 u64 __init dt_mem_next_cell(int s, __be32 **cellp)
 {
 	__be32 *p = *cellp;
+    /* reg는 s만큼의 크기로 늘어남 (4byte로 추정) */
 
 	*cellp = p + s;
 	return of_read_number(p, s);
@@ -765,15 +767,17 @@ u64 __init dt_mem_next_cell(int s, __be32 **cellp)
  * cloudrain21
  *
  * memory 프로퍼티에 설정된 memory cell 들 중
- * 한쌍의 주소와 크기를 bank 라고 함.
+ * 한 쌍의 주소와 크기를 bank 라고 함.
  * 이러한 bank 는 여러개, 즉 여러 cell 일 수 있고 이러한
  * 여러 bank 설정들은 global 자료구조인 meminfo 에 저장된다.
  */
+/*!!C __init .init.data section에 저장해두고 사용 */
 int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
 				     int depth, void *data)
 {
+    /* device_type이라는 node를 찾음 */
 	char *type = of_get_flat_dt_prop(node, "device_type", NULL);
-	__be32 *reg, *endp;
+	__be32 *reg, *endp; // Cells
 	unsigned long l;
 
 	/* We are scanning "memory" nodes only */
@@ -782,22 +786,38 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
 		 * The longtrail doesn't have a device_type on the
 		 * /memory node, so look for the node called /memory@0.
 		 */
+        /*!!C depth가 1이 아니거나, node path가 memory@0가 아니면 리턴 */
 		if (depth != 1 || strcmp(uname, "memory@0") != 0)
 			return 0;
-	} else if (strcmp(type, "memory") != 0)
+	} 
+        /*!!C 타입이 memory가 아니면 역시 리턴 */
+    else if (strcmp(type, "memory") != 0)
 		return 0;
+
+    /*!!C 아래는 memory type이거나 
+       (depth는 1이어야 함) 
+       node path가 memory@0 (longtrail)일 때 수행 */
 
 	reg = of_get_flat_dt_prop(node, "linux,usable-memory", &l);
+	if (reg == NULL) {
+        /*!!C 우리는 이걸 타게 됨. exynos5420에는 linux,usable-memory가 없음*/
+		reg = of_get_flat_dt_prop(node, "reg", &l); 
+        /*!!C reg값을 읽어 옴 */
+    }
 	if (reg == NULL)
-		reg = of_get_flat_dt_prop(node, "reg", &l);
-	if (reg == NULL)
-		return 0;
+		return 0; // 답 없음
 
 	endp = reg + (l / sizeof(__be32));
+    /*!!C reg value의 Byte수를 4byte 단위의 cell 수로 변환해서 endp에 저장 */ 
 
 	pr_debug("memory scan node %s, reg size %ld, data: %x %x %x %x,\n",
 	    uname, l, reg[0], reg[1], reg[2], reg[3]);
 
+    /*!!C Cell size >= dt_root_addr_cells + dt_root_size_cells 
+      dt_root_addr_cells = #address-cells
+      dt_root_size_cells = #size-cells
+     */
+    
 	while ((endp - reg) >= (dt_root_addr_cells + dt_root_size_cells)) {
 		u64 base, size;
 

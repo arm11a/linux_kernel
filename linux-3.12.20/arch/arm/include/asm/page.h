@@ -15,6 +15,18 @@
 #define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
 #define PAGE_MASK		(~((1 << PAGE_SHIFT) - 1))
 
+/*!!C 
+
+  PAGE_MASK
+
+  (1<<12) - 1) 0b 000 1111 1111 111 
+  -> ~ 
+  -> 0b 111... 0000 0000 000 
+  -> 4k byte 
+  4KB Page alignment
+
+ */
+
 #ifndef __ASSEMBLY__
 
 #ifndef CONFIG_MMU

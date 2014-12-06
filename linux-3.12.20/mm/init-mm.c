@@ -13,6 +13,11 @@
 #define INIT_MM_CONTEXT(name)
 #endif
 
+/*!!C
+  Task가 사용하는 메모리들을 다 정의해놓은 메모리 구조.
+  나중에 struct task_struct에서 자기 task가 가지고 있는 메모리를
+  이 메모리 구조를 통해 가지고 있는다.
+ */
 struct mm_struct init_mm = {
 	.mm_rb		= RB_ROOT,
 	.pgd		= swapper_pg_dir,
