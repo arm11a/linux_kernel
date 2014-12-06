@@ -69,7 +69,11 @@ static void __init exynos5_reserve(void)
 				mfc_mem.lsize);
 #endif
 }
-
+/*!!C 빌드시에 Platform 별로 DT_MACHINE_START 의정보를 모두 .arch.info.init 에
+ * 저장시켜놓고필요시에 가져다가 쓴다. 다양한 플랫폼에 대한 초기화 부분이
+ *  __arch_info_begin 부터 __arch_info_end 까지 들어가 있고 device tree 와 일치하는
+ *  것을 찾아서 초기화시 사용한다.
+ * */ 
 DT_MACHINE_START(EXYNOS5_DT, "SAMSUNG EXYNOS5 (Flattened Device Tree)")
 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
 	.smp		= smp_ops(exynos_smp_ops),
