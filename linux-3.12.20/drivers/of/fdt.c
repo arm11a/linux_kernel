@@ -673,9 +673,21 @@ void __init early_init_dt_check_for_initrd(unsigned long node)
 
 	pr_debug("Looking for initrd properties... ");
 
+    /*!!C -------------------------------------------------
+     * node 의 property 에서 linux,initrd-start 키에 해당하는
+     * value 를 찾아서 prop 으로 리턴한다.
+     *----------------------------------------------------*/
 	prop = of_get_flat_dt_prop(node, "linux,initrd-start", &len);
 	if (!prop)
 		return;
+
+    /*!!C -------------------------------------------------
+     * 32bit 이든 64bit 이든 value 들 여러개 설정된 것을 
+     * 마지막 2 개 4byte 값들을 64 bit 하나로 합쳐서 리턴.
+     *
+     * 0x11111111,0x22222222,0x33333333,0x44444444
+     * -> return 0x3333333344444444
+     *----------------------------------------------------*/
 	start = of_read_number(prop, len/4);
 
 	prop = of_get_flat_dt_prop(node, "linux,initrd-end", &len);
@@ -683,6 +695,12 @@ void __init early_init_dt_check_for_initrd(unsigned long node)
 		return;
 	end = of_read_number(prop, len/4);
 
+    /*!!C -------------------------------------------------
+     * 결국 위에서 구한 start 와 end 64 bit 값을 이용하여
+     * initrd start, size 를 구한다.
+     * 32 bit 일 경우에는 u32 로 짤라내기 때문에 마지막
+     * 4 byte 설정값이 start 에 들어가게 된다.
+     *----------------------------------------------------*/
 	early_init_dt_setup_initrd_arch(start, end);
 	pr_debug("initrd_start=0x%llx  initrd_end=0x%llx\n",
 		 (unsigned long long)start, (unsigned long long)end);
@@ -703,6 +721,9 @@ inline void early_init_dt_check_for_initrd(unsigned long node)
  *  node 의 프로퍼티 중에서 #size-cells 와 #address-cells 값을 읽어서
  *  global 변수에 저장한다.
  *  cell 에 대한 좀더 정확한 의미 파악 필요.
+ *
+ *  http://forum.falinux.com/zbxe/?mid=lecture_tip&comment_srl=518031&l=es&sort_index=readed_count&order_type=asc&document_srl=784583
+ *  http://www.devicetree.org/Device_Tree_Usage
  */
 int __init early_init_dt_scan_root(unsigned long node, const char *uname,
 				   int depth, void *data)
@@ -815,9 +836,18 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
 	    (strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen@0") != 0))
 		return 0;
 
+    /*!!C
+     * chosen node 일 때만 이곳까지 올 것이고
+     * 이 때의 node 는 chosen node 의 첫 property 를 가리킴.
+     * chosen node 의 property 중에서 initrd 설정을 찾아서
+     * global initrd 관련 start,size 변수에 넣어준다.
+     */
 	early_init_dt_check_for_initrd(node); /*!!C 14.11.29 */
 
 	/* Retrieve command line */
+    /*!!C
+     * bootargs 에 해당하는 value 를 boot_command_line 에 저장.
+     */
 	p = of_get_flat_dt_prop(node, "bootargs", &l);
 	if (p != NULL && l > 0)
 		strlcpy(data, p, min((int)l, COMMAND_LINE_SIZE));
@@ -831,6 +861,10 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
 #ifndef CONFIG_CMDLINE_FORCE
 	if (!((char *)data)[0])
 #endif
+        /*!!C
+         * bootargs property 에서 가져온 것이 없다면
+         * config 에 설정한 값을 boot_command_line 에 저장해둔다.
+         */
 		strlcpy(data, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
 #endif /* CONFIG_CMDLINE */
 

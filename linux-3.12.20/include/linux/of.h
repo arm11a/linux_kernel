@@ -121,6 +121,13 @@ extern struct device_node *of_find_all_nodes(struct device_node *prev);
  */
 
 /* Helper to read a big number; size is in cells (not bytes) */
+/*!!C -------------------------------------------------
+ * 32bit 이든 64bit 이든 value 들 여러개 설정된 것을 
+ * 마지막 2 개 4byte 값들을 64 bit 하나로 합쳐서 리턴.
+ *
+ * 0x11111111,0x22222222,0x33333333,0x44444444
+ * -> return 0x3333333344444444
+ *----------------------------------------------------*/
 static inline u64 of_read_number(const __be32 *cell, int size)
 {
 	u64 r = 0;
