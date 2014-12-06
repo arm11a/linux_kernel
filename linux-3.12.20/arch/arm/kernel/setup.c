@@ -1080,6 +1080,8 @@ void __init setup_arch(char **cmdline_p)
     /*!!C -------------------------------------------------
      * cloudrain21 추가
      *
+     * dtb binary 는 scripts/dtc 의 dtc 툴을 통해 만들어진다.
+     *
      * device tree 의 정보를 검색 참조하여 machine_desc table 
      * (__arch_info_begin~end)중에서 가장 적합한 것을 찾아낸다.
      * 이 때 device tree 를 검색해나가는 과정에서 노드 정보를

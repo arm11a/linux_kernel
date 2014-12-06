@@ -25,6 +25,10 @@ struct smp_operations;
 #define smp_init_ops(ops) (bool (*)(void))NULL
 #endif
 
+/*!!C -------------------------------------------------
+ * exynos 관련 machine_desc 의 빌드 시 설정되는 정보는
+ * arch/arm/mach-exynos/mach-exynos5-dt.c 파일 참조.
+ *----------------------------------------------------*/
 struct machine_desc {
 	unsigned int		nr;		/* architecture number	*/
 	const char		*name;		/* architecture name	*/
