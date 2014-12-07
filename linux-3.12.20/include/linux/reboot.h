@@ -17,6 +17,13 @@
  *  REBOOT_WARM = REBOOT_SOFT
  */
 enum reboot_mode {
+    /*!!C
+        REBOOT_COLD: 완전 껐다가 켬 (Hardware)
+        REBOOT_WARM: RESET이랑 같다고 보면 됨 (Software)
+        REBOOT_SOFT: WARM이랑 뭐가 다름?
+        REBOOT_HARD: COLD랑 뭐가 다름?
+        REBOOT_GPIO: 외부 IO 단자를 통한 Reboot?
+     */
 	REBOOT_COLD = 0,
 	REBOOT_WARM,
 	REBOOT_HARD,

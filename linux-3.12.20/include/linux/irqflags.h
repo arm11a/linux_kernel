@@ -117,17 +117,23 @@
 		raw_irqs_disabled_flags(flags);		\
 	})
 
+/* !!C
+ * #define irqs_disabled() function descript under line 
+ *
+ * _flags <= cpsr register
+ * unsigned long _flags;
+ *
+ * check if irq bit is set
+ * raw_local_save_flags(_flags);
+ */
+
+/*!!C
+ * _flags <- cpsr register
+ */
 #define irqs_disabled()					\
 	({						\
 		unsigned long _flags;			\
-        /*!!C
-         * _flags <- cpsr register
-         */
 		raw_local_save_flags(_flags);		\
-
-        /*!!C
-         * check if irq bit is set
-         */
 		raw_irqs_disabled_flags(_flags);	\
 	})
 

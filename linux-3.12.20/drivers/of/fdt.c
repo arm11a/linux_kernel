@@ -673,9 +673,21 @@ void __init early_init_dt_check_for_initrd(unsigned long node)
 
 	pr_debug("Looking for initrd properties... ");
 
+    /*!!C -------------------------------------------------
+     * node 의 property 에서 linux,initrd-start 키에 해당하는
+     * value 를 찾아서 prop 으로 리턴한다.
+     *----------------------------------------------------*/
 	prop = of_get_flat_dt_prop(node, "linux,initrd-start", &len);
 	if (!prop)
 		return;
+
+    /*!!C -------------------------------------------------
+     * 32bit 이든 64bit 이든 value 들 여러개 설정된 것을 
+     * 마지막 2 개 4byte 값들을 64 bit 하나로 합쳐서 리턴.
+     *
+     * 0x11111111,0x22222222,0x33333333,0x44444444
+     * -> return 0x3333333344444444
+     *----------------------------------------------------*/
 	start = of_read_number(prop, len/4);
 
 	prop = of_get_flat_dt_prop(node, "linux,initrd-end", &len);
@@ -683,6 +695,12 @@ void __init early_init_dt_check_for_initrd(unsigned long node)
 		return;
 	end = of_read_number(prop, len/4);
 
+    /*!!C -------------------------------------------------
+     * 결국 위에서 구한 start 와 end 64 bit 값을 이용하여
+     * initrd start, size 를 구한다.
+     * 32 bit 일 경우에는 u32 로 짤라내기 때문에 마지막
+     * 4 byte 설정값이 start 에 들어가게 된다.
+     *----------------------------------------------------*/
 	early_init_dt_setup_initrd_arch(start, end);
 	pr_debug("initrd_start=0x%llx  initrd_end=0x%llx\n",
 		 (unsigned long long)start, (unsigned long long)end);
@@ -703,6 +721,9 @@ inline void early_init_dt_check_for_initrd(unsigned long node)
  *  node 의 프로퍼티 중에서 #size-cells 와 #address-cells 값을 읽어서
  *  global 변수에 저장한다.
  *  cell 에 대한 좀더 정확한 의미 파악 필요.
+ *
+ *  http://forum.falinux.com/zbxe/?mid=lecture_tip&comment_srl=518031&l=es&sort_index=readed_count&order_type=asc&document_srl=784583
+ *  http://www.devicetree.org/Device_Tree_Usage
  */
 int __init early_init_dt_scan_root(unsigned long node, const char *uname,
 				   int depth, void *data)
@@ -729,9 +750,11 @@ int __init early_init_dt_scan_root(unsigned long node, const char *uname,
 	return 1;
 }
 
+/*!!C next cell의 value를 읽어들임? */
 u64 __init dt_mem_next_cell(int s, __be32 **cellp)
 {
 	__be32 *p = *cellp;
+    /* reg는 s만큼의 크기로 늘어남 (4byte로 추정) */
 
 	*cellp = p + s;
 	return of_read_number(p, s);
@@ -744,15 +767,17 @@ u64 __init dt_mem_next_cell(int s, __be32 **cellp)
  * cloudrain21
  *
  * memory 프로퍼티에 설정된 memory cell 들 중
- * 한쌍의 주소와 크기를 bank 라고 함.
+ * 한 쌍의 주소와 크기를 bank 라고 함.
  * 이러한 bank 는 여러개, 즉 여러 cell 일 수 있고 이러한
  * 여러 bank 설정들은 global 자료구조인 meminfo 에 저장된다.
  */
+/*!!C __init .init.data section에 저장해두고 사용 */
 int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
 				     int depth, void *data)
 {
+    /* device_type이라는 node를 찾음 */
 	char *type = of_get_flat_dt_prop(node, "device_type", NULL);
-	__be32 *reg, *endp;
+	__be32 *reg, *endp; // Cells
 	unsigned long l;
 
 	/* We are scanning "memory" nodes only */
@@ -761,22 +786,38 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
 		 * The longtrail doesn't have a device_type on the
 		 * /memory node, so look for the node called /memory@0.
 		 */
+        /*!!C depth가 1이 아니거나, node path가 memory@0가 아니면 리턴 */
 		if (depth != 1 || strcmp(uname, "memory@0") != 0)
 			return 0;
-	} else if (strcmp(type, "memory") != 0)
+	} 
+        /*!!C 타입이 memory가 아니면 역시 리턴 */
+    else if (strcmp(type, "memory") != 0)
 		return 0;
+
+    /*!!C 아래는 memory type이거나 
+       (depth는 1이어야 함) 
+       node path가 memory@0 (longtrail)일 때 수행 */
 
 	reg = of_get_flat_dt_prop(node, "linux,usable-memory", &l);
+	if (reg == NULL) {
+        /*!!C 우리는 이걸 타게 됨. exynos5420에는 linux,usable-memory가 없음*/
+		reg = of_get_flat_dt_prop(node, "reg", &l); 
+        /*!!C reg값을 읽어 옴 */
+    }
 	if (reg == NULL)
-		reg = of_get_flat_dt_prop(node, "reg", &l);
-	if (reg == NULL)
-		return 0;
+		return 0; // 답 없음
 
 	endp = reg + (l / sizeof(__be32));
+    /*!!C reg value의 Byte수를 4byte 단위의 cell 수로 변환해서 endp에 저장 */ 
 
 	pr_debug("memory scan node %s, reg size %ld, data: %x %x %x %x,\n",
 	    uname, l, reg[0], reg[1], reg[2], reg[3]);
 
+    /*!!C Cell size >= dt_root_addr_cells + dt_root_size_cells 
+      dt_root_addr_cells = #address-cells
+      dt_root_size_cells = #size-cells
+     */
+    
 	while ((endp - reg) >= (dt_root_addr_cells + dt_root_size_cells)) {
 		u64 base, size;
 
@@ -815,9 +856,18 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
 	    (strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen@0") != 0))
 		return 0;
 
+    /*!!C
+     * chosen node 일 때만 이곳까지 올 것이고
+     * 이 때의 node 는 chosen node 의 첫 property 를 가리킴.
+     * chosen node 의 property 중에서 initrd 설정을 찾아서
+     * global initrd 관련 start,size 변수에 넣어준다.
+     */
 	early_init_dt_check_for_initrd(node); /*!!C 14.11.29 */
 
 	/* Retrieve command line */
+    /*!!C
+     * bootargs 에 해당하는 value 를 boot_command_line 에 저장.
+     */
 	p = of_get_flat_dt_prop(node, "bootargs", &l);
 	if (p != NULL && l > 0)
 		strlcpy(data, p, min((int)l, COMMAND_LINE_SIZE));
@@ -831,6 +881,10 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
 #ifndef CONFIG_CMDLINE_FORCE
 	if (!((char *)data)[0])
 #endif
+        /*!!C
+         * bootargs property 에서 가져온 것이 없다면
+         * config 에 설정한 값을 boot_command_line 에 저장해둔다.
+         */
 		strlcpy(data, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
 #endif /* CONFIG_CMDLINE */
 

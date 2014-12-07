@@ -30,6 +30,19 @@
 	};
 
 	cpus {
+        /*!!C -------------------------------------------------
+         * address-cells = 1 이면 cell 하나로 표현된다. (32 bit)
+         * address-cells = 2 이면 cell 두개로 표현된다. (64 bit)
+         * 하위 node 모두에 영향을 미친다.
+         * size-cells = 0 이면 cell 내의 size 미제공. (value 가 아예 없다)
+         * size-cells = 1 이면 32 bit 짜리 size 가 제공되는 것.
+         *
+         * reg -> device 가 사용하는 local memory 영역들에 대한 정보
+         *        device 별로 reg 값이 주소일 수도 있고 식별자로 사용될 수도 있다.
+         * ranges -> reg 정보를 cpu 가 사용할 수 있도록 global 하게
+         *           mapping 해줄 수 있는 정보.
+         *   http://www.devicetree.org/Device_Tree_Usage
+         *----------------------------------------------------*/
 		#address-cells = <1>;
 		#size-cells = <0>;
 

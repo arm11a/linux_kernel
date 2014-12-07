@@ -810,7 +810,23 @@ void __init dump_machine_table(void)
 
 int __init arm_add_memory(phys_addr_t start, phys_addr_t size)
 {
+    /*!!C struct meminfo global variable
+
+      struct meminfo {
+            int nr_banks;
+            struct membank bank[NR_BANKS];
+      };
+        struct membank {
+            // phys_addr_t 는 32비트일 것이다
+	        phys_addr_t start;
+	        phys_addr_t size;
+	        unsigned int highmem;
+        };
+
+        meminfo.nr_banks는 배열에 대한 index이다.
+     */
 	struct membank *bank = &meminfo.bank[meminfo.nr_banks];
+    /*!!C 해당 bank에 대한 pointer를 가져온다 */
 	u64 aligned_start;
 
 	if (meminfo.nr_banks >= NR_BANKS) {
@@ -823,11 +839,44 @@ int __init arm_add_memory(phys_addr_t start, phys_addr_t size)
 	 * Ensure that start/size are aligned to a page boundary.
 	 * Size is appropriately rounded down, start is rounded up.
 	 */
-	size -= start & ~PAGE_MASK;
+	size -= ( start & ~PAGE_MASK ); 
+    /*!!C 
+      e. g.
+
+      -> ROUND DOWN 연산 
+          size가 31kB 
+          -> ( start & ~PAGE_MASK ) 를 거치면 
+          -> 3KB 가 남는다.
+          이걸 size에서 빼면 -> 28KB가 된다. 
+
+      ( start & ~PAGE_MASK )는 하위 4KB 값은 잘라내며,
+      이걸 size에서 빼서 round down 한다. 
+     */
+
 	aligned_start = PAGE_ALIGN(start);
+    /*!!C 
+
+        x: 주소가 넘어옴
+        a: 값?
+
+        -> ROUND UP 연산
+            예를 들어 x가 8이면 (typeof(x))(a) - 1 은 u64타입의 7일 될 것. 
+            여기서 7은 이건 마스킹.
+            ( 8 + 7 ) & ~( 8 ) -> 이렇게 하면 8의 round up이 된다.
+            무지 많이 나오는 거니 외울 것.
+
+         define __ALIGN_KERNEL(x, a)		__ALIGN_KERNEL_MASK(x, (typeof(x))(a) - 1)
+         define __ALIGN_KERNEL_MASK(x, mask)	(((x) + (mask)) & ~(mask))
+     */
+    /*!!C 
+      결과적으로 size는 rounded down됐고 aligned_start는 rounded up되어서
+      memory violation은 일어나지 않을 듯! */
 
 #ifndef CONFIG_ARCH_PHYS_ADDR_T_64BIT
 	if (aligned_start > ULONG_MAX) {
+        /*!!C 
+            #define ULONG_MAX	(~0UL) ~0000... -> 1111...
+        */
 		printk(KERN_CRIT "Ignoring memory at 0x%08llx outside "
 		       "32-bit physical address space\n", (long long)start);
 		return -EINVAL;
@@ -841,26 +890,48 @@ int __init arm_add_memory(phys_addr_t start, phys_addr_t size)
 		 * 32 bits, we use ULONG_MAX as the upper limit rather than 4GB.
 		 * This means we lose a page after masking.
 		 */
-		size = ULONG_MAX - aligned_start;
+		size = ULONG_MAX - aligned_start; 
+        /*!!C 사이즈 강제 조정 */
 	}
 #endif
 
-	if (aligned_start < PHYS_OFFSET) {
-		if (aligned_start + size <= PHYS_OFFSET) {
-			pr_info("Ignoring memory below PHYS_OFFSET: 0x%08llx-0x%08llx\n",
-				aligned_start, aligned_start + size);
-			return -EINVAL;
-		}
+    /*!!C 복습! */
+    if (aligned_start < PHYS_OFFSET) {
+        /*!!C
+          -> arch/arm/include/asm/memory.h 에서는 아래와 같이 
+          외부 __pv_phys_offset을 가져다 쓴다.
+          " extern unsigned long __pv_phys_offset;
+          " #define PHYS_OFFSET __pv_phys_offset
 
-		pr_info("Ignoring memory below PHYS_OFFSET: 0x%08llx-0x%08llx\n",
-			aligned_start, (u64)PHYS_OFFSET);
+          그리고 이 __pv_phys_offset은 
+          -> arch/arm/kernel/head.S에서 아래와 같이 선언되어 있다.
+          " __pv_phys_offset:
+          "	.long	0
+          "	.size	__pv_phys_offset, . - __pv_phys_offset
 
-		size -= PHYS_OFFSET - aligned_start;
-		aligned_start = PHYS_OFFSET;
-	}
+          -> 복습
+          PHYS_OFFSET 은 일단 잠정적으로
+          Main memory의 첫 번째 뱅크의 시작 주소를 가르킬 것이라고 추측함.
+         */
+
+        if (aligned_start + size <= PHYS_OFFSET) {
+            pr_info("Ignoring memory below PHYS_OFFSET: 0x%08llx-0x%08llx\n",
+                    aligned_start, aligned_start + size);
+            return -EINVAL;
+        }
+
+        pr_info("Ignoring memory below PHYS_OFFSET: 0x%08llx-0x%08llx\n",
+                aligned_start, (u64)PHYS_OFFSET);
+
+        size -= PHYS_OFFSET - aligned_start;
+        aligned_start = PHYS_OFFSET;
+    }
 
 	bank->start = aligned_start;
 	bank->size = size & ~(phys_addr_t)(PAGE_SIZE - 1);
+    /*!!C 
+      size를 PAGE_SIZE로 마스킹해서 bank->size에 할당함
+     */
 
 	/*
 	 * Check whether this memory region has non-zero size or
@@ -1092,8 +1163,17 @@ void __init setup_arch(char **cmdline_p)
      * (또는 atags 시작주소)
      *----------------------------------------------------*/
 	mdesc = setup_machine_fdt(__atags_pointer); //04-11-15 시작
+    /*!!C
+      atags는 dtb가 나오기 전에 씀. 
+      bootloader에서 넘어오는 정보가 있음.
+
+      dtb는 최신이며 덜 구림. 
+      XML-like format으로 간편하게 파싱해서 
+      읽어들일 수 있음.
+     */
 	if (!mdesc)
 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+    /*!!C Globalization : machine_desc */
 	machine_desc = mdesc;
 	machine_name = mdesc->name;
 
@@ -1125,6 +1205,14 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.start_code = (unsigned long) _text;
 	init_mm.end_code   = (unsigned long) _etext;
 	init_mm.end_data   = (unsigned long) _edata;
+    /*!!C
+      cloudrain21님의 커다란 공헌
+
+      프로세스 메모리 구조에서
+      BSS 영역의 끝이자  Heap 영역의 시작점을 
+      BRK라고 보면 됨. 
+      Heap을 할당할 때 brk를 점점 늘려감.
+     */
 	init_mm.brk	   = (unsigned long) _end;
 
 	/* populate cmd_line too for later use, preserving boot_command_line */
@@ -1134,6 +1222,8 @@ void __init setup_arch(char **cmdline_p)
      * 변수에 복제해둔다.
      *----------------------------------------------------*/
 	strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
+    /*!!C Parameter로 가져온 cmdline_p에 세팅해서 command_line이라는 이름으로 
+      setup_arch에서 사용함 */
 	*cmdline_p = cmd_line;
 
     /*!!C -------------------------------------------------
@@ -1143,6 +1233,9 @@ void __init setup_arch(char **cmdline_p)
      *  value 를 설정해준다.
      *  early param 에서는 .init.setup section 에만 작업한다.
      *----------------------------------------------------*/
+    /*!!C
+      2014.12.06 일에 김건호가 여기까지 드라이빙했음
+     */
 	parse_early_param();
 
     /*!!C -------------------------------------------------
