@@ -887,7 +887,8 @@ static void __init create_mapping(struct map_desc *md)
 	length = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
 
     /*!!Q -------------------------------------------------
-     * 이건 뭐하자는건지 모르겠네...
+     * type->prot_l1 == 0 이면서 addr, phys, length 가 모두
+     * section size 로 align 되어 있지 않으면 
      *----------------------------------------------------*/
 	if (type->prot_l1 == 0 && ((addr | phys | length) & ~SECTION_MASK)) {
 		printk(KERN_WARNING "BUG: map for 0x%08llx at 0x%08lx can not "
@@ -915,6 +916,10 @@ static void __init create_mapping(struct map_desc *md)
          *----------------------------------------------------*/
 		unsigned long next = pgd_addr_end(addr, end);
 
+        /*!!C -------------------------------------------------
+         * pud(pgd) 하나를 할당해서 초기화하는 것 같은데
+         * 함수 depth 가 죽음이네... 어렵다...
+         *----------------------------------------------------*/
 		alloc_init_pud(pgd, addr, next, phys, type);
 
         /*!!C -------------------------------------------------
@@ -1309,9 +1314,10 @@ static inline void prepare_page_table(void)
      * PAGE_OFFSET - the virtual address of the start of the kernel image
      * MODULES_VADDR = PAGE_OFFSET - SZ_8M
      *
-     * 8 byte 씩 clear 한다.
+     * 8 byte 씩 clear 한다. (4 byte 당 1 MB 해당)
      *  - 4 byte 2 개를 0 으로 설정하고,
      *  - tlb flush operation 을 수행한다.
+     * 즉, 2 MB 를 담당하는 pgd entry (4byte 2개)를 초기화한다.
      *----------------------------------------------------*/
 	for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)
 		pmd_clear(pmd_off_k(addr));
@@ -1520,6 +1526,10 @@ static void __init map_lowmem(void)
 		map.length = end - start;
 		map.type = MT_MEMORY;
 
+        /*!!C -------------------------------------------------
+         * 선택된 low memory region 에 대해 page directory 를
+         * MT_MEMORY type 으로 entry 만들고 초기화 ?
+         *----------------------------------------------------*/
 		create_mapping(&map);
 	}
 }
@@ -1543,7 +1553,7 @@ void __init paging_init(const struct machine_desc *mdesc)
 
     /*!!C -------------------------------------------------
      * 현재 초기화되지 않은 pgd(pmd) entry 초기화
-     * user 영역(3064 M), module 영역(8 M), VMALLOC gap (8 M)
+     * (user 영역(3064 M), module 영역(8 M), VMALLOC gap (8 M))
      *
      * 모기향책 205, 210 page 의 그림 참조.
      *
@@ -1566,14 +1576,58 @@ void __init paging_init(const struct machine_desc *mdesc)
      * +----------------+--------------+----------------+
      *    11 bit [31:21]  9 bit [20:12]   12 bit [11:0]
      *    2048 entry      512 entry
+     *    PGDIR_SHIFT = PMD_SHIFT
+     * 
+     * 그런데 !!!
+     * 2-level 에서는 pgd 만 있고 pmd 를 그럼 안사용하나 ?
+     * 아니다. pgd 는 2MB 단위로 사용하고, PMD는 1MB 단위로 사용한다.
+     * PGD를 section 2개 (2MB)에 대한 pointer로 사용하고 PMD는
+     * 각각 1MB section을 가리킨다.
+     * 결국 PGD와 PMD 모두 L1 descriptor 관리에 사용된다.
+     *
+     * page table 관련 iamroot 의 내용 쭈욱 읽어볼 것.
+     *  http://www.iamroot.org/xe/Kernel_10_ARM/186592#comment_186781
      *----------------------------------------------------*/
 	prepare_page_table();
 
+
+    /*!!C -------------------------------------------------
+     * 참고 !!
+     *
+     *   16 KB = 8 byte * 2048 entry
+     *
+     *   11 bit (2048)     9 bit (512)    12 bit (4096)
+     * +----------------+--------------+----------------+
+     * |      pmd       |     pte      |    offset      |
+     * +----------+-----+-------+------+------+---------+
+     *            |             |             |
+     *            |             |             |   +-------------+
+     *            |             +---------+   |   |             |
+     *            |                       |   |   |             |
+     *            |                       |   |   |             |
+     *            |   | kernel image   |  |   |   +-------------+
+     * 0xc0008000 |   +----------------+  |   +-->|   4 KB      | 2 MB section
+     *            |   |                |  +------>+-------------+   = 4 KB * 512
+     *   16 KB    |   |      pgd       |          |             |
+     *            +-->| (2048 entry)   |--------->+-------------+
+     *                |section entry 10|       
+     * 0xc0004000 +-->+----------------+
+     *            |   |                |
+     *            |                
+     *            +--+
+     *               |
+     *  init_mm.pgd -+
+     *
+     *----------------------------------------------------*/
+
     /*!!C -------------------------------------------------
      * memblock 의 모든 region 중에서 lowmem 에 해당하는
-     * region 만 
+     * region 만 선택하여 mapping 되는 pgd entry 를 할당하고 초기화함.
+     *
+     * http://www.iamroot.org/xe/Kernel_10_ARM/186592#comment_186781
      *----------------------------------------------------*/
 	map_lowmem();
+
 	dma_contiguous_remap();
 	devicemaps_init(mdesc);
 	kmap_init();

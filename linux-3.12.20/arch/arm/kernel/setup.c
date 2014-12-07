@@ -896,6 +896,14 @@ int __init arm_add_memory(phys_addr_t start, phys_addr_t size)
 #endif
 
     /*!!C 복습! */
+    /*!!C
+     * Documentation/arm/Porting 에 보면 PHYS_OFFSET, ZRELADDR 등
+     * 각종 symbol 에 대한 의미들이 잘 설명되어 있다.
+     *  PHYS_OFFSET :    Physical start address of the first bank of RAM.
+     *  PAGE_OFFSET :    Virtual start address of the first bank of RAM.
+     *  TEXTADDR :     Virtual start address of kernel, normally PAGE_OFFSET + 0x8000.
+     *  ZRELADDR :       __virt_to_phys(TEXTADDR) == ZRELADDR
+     */
     if (aligned_start < PHYS_OFFSET) {
         /*!!C
           -> arch/arm/include/asm/memory.h 에서는 아래와 같이 

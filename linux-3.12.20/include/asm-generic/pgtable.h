@@ -243,6 +243,9 @@ static inline int pmd_same(pmd_t pmd_a, pmd_t pmd_b)
  * 그 더한 자리(__boundary)를 리턴하고, 크거나 같으면
  * 그게 곧 끝이므로 end 를 리턴한다.
  * 즉, 2 MB 단위의 다음 boundary 주소를 구하기 위한 것이다. 
+ * -1을 하는 이유는 unsigned형이기 때문에 boundary의 연산이
+ * 0xFFE0_0000 에서 2M를 더하면 0이 되어 버린다.
+ * 이런 현상을 방지하려고 -1을 하여 연산한다.
  *----------------------------------------------------*/
 #define pgd_addr_end(addr, end)						\
 ({	unsigned long __boundary = ((addr) + PGDIR_SIZE) & PGDIR_MASK;	\

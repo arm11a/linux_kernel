@@ -180,6 +180,31 @@
  */
 #define __PV_BITS_31_24	0x81000000
 
+/*!!C
+PHYS_OFFSET 은 arm/kernel/head.S 의 거의 처음 부분에서 
+야래와 같이 구해졌다. (r8)
+즉, PAGE_OFFSET 값에 delta 값을 적용하여 구한 값이다.
+그리고, 이 값은 __fixup_pv_table 에서 r8 레지스터 값이
+__pv_phys_offset 에 저장되었다.
+
+#ifndef CONFIG_XIP_KERNEL
+    //!!C-----------------------------------------------------------------
+     *  2:	.long	.
+     *      .long	PAGE_OFFSET
+     -------------------------------------------------------------------
+	adr	r3, 2f
+	ldmia	r3, {r4, r8}
+	sub	r4, r3, r4			@ (PHYS_OFFSET - PAGE_OFFSET)
+
+    //!!C-----------------------------------------------------------------
+     * physical RAM start address = PHYS_OFFSET
+     * = PAGE_OFFSET + delta offset(r4)
+     -------------------------------------------------------------------
+	add	r8, r8, r4			@ PHYS_OFFSET, page_offset(0xc0000000)
+#else
+	ldr	r8, =PHYS_OFFSET		@ always constant in this case
+#endif
+*/
 extern unsigned long __pv_phys_offset;
 #define PHYS_OFFSET __pv_phys_offset
 
