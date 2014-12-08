@@ -707,6 +707,10 @@ static void __init __map_init_section(pmd_t *pmd, unsigned long addr,
 	if (addr & SECTION_SIZE)
 		pmd++;
 #endif
+    /*!!C -------------------------------------------------
+     * addr ~ end 에 해당하는 pmd entry 들을 phys | prot_sect 값으로
+     * 설정한다.
+     *----------------------------------------------------*/
 	do {
 		*pmd = __pmd(phys | type->prot_sect);
 		phys += SECTION_SIZE;
@@ -735,6 +739,11 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
 		 */
 		if (type->prot_sect &&
 				((addr | next | phys) & ~SECTION_MASK) == 0) {
+            /*!!C -------------------------------------------------
+             * 우리는 prot_sect 가 설정되어 있고, addr/next/phys 가
+             * section boundary 로 align 되어 있다고 볼 수 있으므로
+             * 여기를 탈까 ?
+             *----------------------------------------------------*/
 			__map_init_section(pmd, addr, next, phys, type);
 		} else {
 			alloc_init_pte(pmd, addr, next,
@@ -758,6 +767,10 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
 
 	do {
 		next = pud_addr_end(addr, end);
+        /*!!C -------------------------------------------------
+         * 2-level 에서는 결국 alloc_init_pud, alloc_init_pmd 의
+         * depth 는 무시해도 될 것 같은데...
+         *----------------------------------------------------*/
 		alloc_init_pmd(pud, addr, next, phys, type);
 		phys += next - addr;
 	} while (pud++, addr = next, addr != end);
@@ -840,8 +853,9 @@ static void __init create_mapping(struct map_desc *md)
 	pgd_t *pgd;
 
     /*!!C -------------------------------------------------
-     * md 가 가리키는 메모리가 vector table 도 아니면서
+     * md 가 가리키는 메모리가 vector table 이 아니고,
      * user task space 영역일 경우에는 mapping 을 하지 않는다.
+     * prepare_page_table 함수에서 user 영역 초기화는 이미 수행했다.
      *----------------------------------------------------*/
 	if (md->virtual != vectors_base() && md->virtual < TASK_SIZE) {
 		printk(KERN_WARNING "BUG: not creating mapping for 0x%08llx"
@@ -919,6 +933,12 @@ static void __init create_mapping(struct map_desc *md)
         /*!!C -------------------------------------------------
          * pud(pgd) 하나를 할당해서 초기화하는 것 같은데
          * 함수 depth 가 죽음이네... 어렵다...
+         *
+         * pgd  : addr 의 page directory offset
+         * addr : 2 MB 씩 이동하는 시작주소 
+         * next : addr 의 다음 2 MB 시작 주소 
+         * phys : 현재 addr 의 물리주소 
+         * type : MT_MEMORY 에 해당하는 mem_types
          *----------------------------------------------------*/
 		alloc_init_pud(pgd, addr, next, phys, type);
 
@@ -1072,10 +1092,10 @@ void __init debug_ll_io_init(void)
 #endif
 
 /*!!C -------------------------------------------------
- * 2^10 = 1K
- * 2^20 = 1M
- * 240 << 20 은 한마디로 240 M 라는 얘기 
- * 그런데 왜 240 M를 뺐을까 ?
+ * 왜 240 M를 뺐을까 ?
+ * x86 과 같이 896 MB 를 제외한 128 MB 를 highmem 으로
+ * 사용하기에는 ARM 에서 16 MB (high exception vector)가
+ * 추가로 제약되어 256 MB 로 Align 한 것으로 보인다.
  *
  * vmalloc_min = 4080 MB - 240 MB - 8 MB = 3832 MB
  * VMALLOC_END = 0xff000000
@@ -1310,7 +1330,7 @@ static inline void prepare_page_table(void)
     /*!!C -------------------------------------------------
      * Virtual Address 0 ~ MODULES_VADDR까지 영역에 대한
      * 페이지테이블 영역 Clear 
-     * kernel 아래 부분에 대한 clear 이다.
+     * kernel 아래 부분 user 영역에 대한 clear 이다.
      * PAGE_OFFSET - the virtual address of the start of the kernel image
      * MODULES_VADDR = PAGE_OFFSET - SZ_8M
      *
@@ -1350,7 +1370,7 @@ static inline void prepare_page_table(void)
 	 * memory bank, up to the vmalloc region.
 	 */
     /*!!C -------------------------------------------------
-     * low memory ~ high memory gap 영역(최대 8 M)에 대한 clear
+     * low memory ~ high memory gap 영역-Gap(최대 8 M)에 대한 clear
      * 왜냐하면 VMALLOC_START 는 8 M align 한 자리이므로.
      *----------------------------------------------------*/
 	for (addr = __phys_to_virt(end);
@@ -1512,6 +1532,10 @@ static void __init map_lowmem(void)
 		phys_addr_t end = start + reg->size;
 		struct map_desc map;
 
+        /*!!C -------------------------------------------------
+         * sanity_check_meminfo 함수에서 모든 lowmem bank 중에서
+         * 가장 end 값이 큰 것을 arm_lowmem_limit 으로 저장했었음.
+         *----------------------------------------------------*/
 		if (end > arm_lowmem_limit)
 			end = arm_lowmem_limit;
 		if (start >= end)
@@ -1538,6 +1562,12 @@ static void __init map_lowmem(void)
  * paging_init() sets up the page tables, initialises the zone memory
  * maps, and sets up the zero page, bad page and bad page tables.
  */
+/*!!C -------------------------------------------------
+ * 요거 스터디 진행하면서 VMALLOC_START 는 어디인지,
+ * highmem, lowmem 은 어디까지인지 반드시 주소 단위로
+ * 그림을 그려볼 것. !!!
+ * (memory map 이 머리속에 그려져야 한다.)
+ *----------------------------------------------------*/
 void __init paging_init(const struct machine_desc *mdesc)
 {
 	void *zero_page;
@@ -1594,22 +1624,30 @@ void __init paging_init(const struct machine_desc *mdesc)
     /*!!C -------------------------------------------------
      * 참고 !!
      *
+     * 그런데, 이거 arch/arm/include/asm/pgtable-2level.h 에
+     * 있는 H/W PTE 같은걸 개념 이해 아직 못했음. !!
+     * 1024 * 1024 * 4096 이면 4 G 를 커버 가능한데,
+     * pgd 는 왜 4096 개의 entry 를 가질까 ? 1024 개면 되는거 아냐 ?
+     * 
+     * 아하 !! 
+     *  http://studyfoss.egloos.com/viewer/5008142
+     *
      *   16 KB = 8 byte * 2048 entry
      *
      *   11 bit (2048)     9 bit (512)    12 bit (4096)
      * +----------------+--------------+----------------+
-     * |      pmd       |     pte      |    offset      |
-     * +----------+-----+-------+------+------+---------+
-     *            |             |             |
-     *            |             |             |   +-------------+
-     *            |             +---------+   |   |             |
-     *            |                       |   |   |             |
-     *            |                       |   |   |             |
-     *            |   | kernel image   |  |   |   +-------------+
-     * 0xc0008000 |   +----------------+  |   +-->|   4 KB      | 2 MB section
-     *            |   |                |  +------>+-------------+   = 4 KB * 512
-     *   16 KB    |   |      pgd       |          |             |
-     *            +-->| (2048 entry)   |--------->+-------------+
+     * |      pgd       |     pte      |    offset      |
+     * +----------+-----+-------+------+--------+-------+
+     *            |             |               |
+     *            |             |               |
+     *            |             +---------+     +-------------+
+     *            |                       |                   |  +------------+
+     *            |                       |                   |  |   page     |
+     *            |   | kernel image   |  |   +-------------+ +->| ( 4 KB )   |
+     * 0xc0008000 |   +----------------+  |   |     pte     |    |            |
+     *            |   |                |  +-->|             |--->+------------+
+     *   16 KB    |   |      pgd       |      |             |
+     *            +-->| (2048 entry)   |----->+-------------+
      *                |section entry 10|       
      * 0xc0004000 +-->+----------------+
      *            |   |                |
@@ -1622,7 +1660,9 @@ void __init paging_init(const struct machine_desc *mdesc)
 
     /*!!C -------------------------------------------------
      * memblock 의 모든 region 중에서 lowmem 에 해당하는
-     * region 만 선택하여 mapping 되는 pgd entry 를 할당하고 초기화함.
+     * region 만 선택하여 mapping 되는 pgd entry 를 초기화함.
+     * user 영역, module, gap 영역은 위쪽 prepare_page_table 에서 수행했음.
+     * page table 구조를 명확히 이해하고 코드를 보며 쉬울 것임.
      *
      * http://www.iamroot.org/xe/Kernel_10_ARM/186592#comment_186781
      *----------------------------------------------------*/

@@ -48,6 +48,12 @@
  *----------------------------------------------------*/
 #define VMALLOC_OFFSET		(8*1024*1024)
 #define VMALLOC_START		(((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
+
+/*!!C -------------------------------------------------
+ * VMALLOC_END 가 왜 0xff000000 일까 ?
+ * 맨 마지막 16 MB 가 high exception vector 가 존재하는 곳이다.
+ * 이 부분을 뺀 것이다.
+ *----------------------------------------------------*/
 #define VMALLOC_END		0xff000000UL   /*!!C  4G - 16M */
 
 #define LIBRARY_TEXT_START	0x0c000000

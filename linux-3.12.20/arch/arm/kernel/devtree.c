@@ -300,6 +300,9 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 	 * 넣어놓고 본 함수에서 받은 device tree blobb 와 비교하여 가장 적은 score 를 
 	 * 받는 machine description을 선택한다
 	 *  best = 가장작은 스코어
+     *
+     * 아래와 같이 여러개 설정할 수 있는데 그 중 가장 앞의 것일수로 best match
+     *  compatible = "lacie,cloudbox", "marvell,kirkwood-88f6702", "marvell,kirkwood";
 	 */
 	for_each_machine_desc(mdesc) {
 		score = of_flat_dt_match(dt_root, mdesc->dt_compat);

@@ -36,8 +36,8 @@ struct memblock_type {
 
 struct memblock {
 	phys_addr_t current_limit;
-	struct memblock_type memory;
-	struct memblock_type reserved;
+	struct memblock_type memory;   /*!!C 물리적으로 쓸수 있는 영역 설정 */
+	struct memblock_type reserved; /*!!C 사용하지 말아야할 부분 설정 - kernel 이 사용하는 부분 등 */
 };
 
 extern struct memblock memblock;

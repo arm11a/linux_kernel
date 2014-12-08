@@ -23,6 +23,11 @@
  *	__entry_text_start, __entry_text_end
  *	__ctors_start, __ctors_end
  */
+/*!!C -------------------------------------------------
+ * 이 변수들은 compile 시에는 undefined symbol 로 매핑하고,
+ * link 수행 시 link script 나 다른 c 파일의 symbol table 정보와
+ * 연결하여 해당 정보를 갱신한다.
+ *----------------------------------------------------*/
 extern char _text[], _stext[], _etext[];
 extern char _data[], _sdata[], _edata[];
 extern char __bss_start[], __bss_stop[];

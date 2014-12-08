@@ -10,6 +10,12 @@
 #ifndef _ASM_PGTABLE_2LEVEL_H
 #define _ASM_PGTABLE_2LEVEL_H
 
+/*!!C -------------------------------------------------
+ * 이거 뭔말인지 정확히 이해하지 못했음.
+ * 하드웨어용 테이블과 리눅스용 테이블을 구분한 이유...
+ *   http://studyfoss.egloos.com/viewer/5008142
+ *   http://iamroot.org/wiki/doku.php?id=%EC%8A%A4%ED%84%B0%EB%94%94:kernel_%EC%8A%A4%ED%84%B0%EB%94%94_10%EC%B0%A8_arm_c
+ *----------------------------------------------------*/
 /*
  * Hardware-wise, we have a two level page table structure, where the first
  * level has 4096 entries, and the second level has 256 entries.  Each entry

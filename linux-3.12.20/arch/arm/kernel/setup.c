@@ -1171,17 +1171,8 @@ void __init setup_arch(char **cmdline_p)
      * (또는 atags 시작주소)
      *----------------------------------------------------*/
 	mdesc = setup_machine_fdt(__atags_pointer); //04-11-15 시작
-    /*!!C
-      atags는 dtb가 나오기 전에 씀. 
-      bootloader에서 넘어오는 정보가 있음.
-
-      dtb는 최신이며 덜 구림. 
-      XML-like format으로 간편하게 파싱해서 
-      읽어들일 수 있음.
-     */
 	if (!mdesc)
 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
-    /*!!C Globalization : machine_desc */
 	machine_desc = mdesc;
 	machine_name = mdesc->name;
 
@@ -1194,6 +1185,19 @@ void __init setup_arch(char **cmdline_p)
     /*!!C -------------------------------------------------
      * cloudrain21
      *  각 reboot 모드가 무엇인지 확인하고 넘어가자.
+     *
+     * HARD는 hardware적으로 reset 시그널이 있고, 소프트리셋 시그널이 따로 있다.
+     * 결국 HARD reset은 칩 전체 reset, SOFT는 칩중 일부분만 reset 이다.
+     * SOFT의 경우 이렇게 하는 이유는, 일부 IP의 경우 reset을 안하는 경우가 있어서 그렇다.
+     *
+     * - REBOOT_COLD: 일반적으로 power on/off
+     * - REBOOT_HARD: chip에 연결된 HW reset (PC에서 reset 버튼)
+     * - REBOOT_WARM: chip에 연결된 HW reset
+     *                (PLL, test logic 등의 일부 HW를 reset에서 제외, 주로 watchdog과 연결)
+     * - REBOOT_SOFT: software에 의한 reset (ctrl+alt+reset 키)
+     * - REBOOT_GPIO: GPIO signal에 의한 reset
+     *
+     * 개념적으로는 구분이 있으나 실제 chip에서 SOFT, WARM등의 경계가 모호하다.
      *----------------------------------------------------*/
 	if (mdesc->reboot_mode != REBOOT_HARD)
 		reboot_mode = mdesc->reboot_mode;
@@ -1210,17 +1214,15 @@ void __init setup_arch(char **cmdline_p)
      *  brk        : bss 영역의 끝 = heap 할당의 시작 
      *               break 라고 부르며 break 값을 늘리면서 heap 을 할당 
      *----------------------------------------------------*/
+    /*!!C -------------------------------------------------
+     * _text, _etext 등의 변수들은 compile 시에는
+     * undefined symbol 로 매핑하고, link 수행 시 link script 나
+     * 다른 c 파일의 symbol table 정보와 연결하여 해당 정보를 갱신한다.
+     * include/asm-generic/sections.h 파일 참조.
+     *----------------------------------------------------*/
 	init_mm.start_code = (unsigned long) _text;
 	init_mm.end_code   = (unsigned long) _etext;
 	init_mm.end_data   = (unsigned long) _edata;
-    /*!!C
-      cloudrain21님의 커다란 공헌
-
-      프로세스 메모리 구조에서
-      BSS 영역의 끝이자  Heap 영역의 시작점을 
-      BRK라고 보면 됨. 
-      Heap을 할당할 때 brk를 점점 늘려감.
-     */
 	init_mm.brk	   = (unsigned long) _end;
 
 	/* populate cmd_line too for later use, preserving boot_command_line */
@@ -1230,8 +1232,6 @@ void __init setup_arch(char **cmdline_p)
      * 변수에 복제해둔다.
      *----------------------------------------------------*/
 	strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
-    /*!!C Parameter로 가져온 cmdline_p에 세팅해서 command_line이라는 이름으로 
-      setup_arch에서 사용함 */
 	*cmdline_p = cmd_line;
 
     /*!!C -------------------------------------------------

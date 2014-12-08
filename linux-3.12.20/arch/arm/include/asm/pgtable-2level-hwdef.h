@@ -47,6 +47,10 @@
  * + Level 1 descriptor (PMD)
  *   - common
  */
+/*!!C -------------------------------------------------
+ * Level 1 Entry 의 마지막 2 bit 를 이용하여 Entry 가
+ * 가리키는 것이 Section 이냐, Fault 냐 Fine 이냐를 나타냄.
+ *----------------------------------------------------*/
 #define PMD_TYPE_MASK		(_AT(pmdval_t, 3) << 0)
 #define PMD_TYPE_FAULT		(_AT(pmdval_t, 0) << 0)
 #define PMD_TYPE_TABLE		(_AT(pmdval_t, 1) << 0)
@@ -57,6 +61,10 @@
 /*
  *   - section
  */
+/*!!C -------------------------------------------------
+ * Level 1 Entry 의 마지막 2 bit 가 10 으로 section 을
+ * 가리킬 경우 Entry 의 다른 bit 들에 대한 정의 
+ *----------------------------------------------------*/
 #define PMD_SECT_BUFFERABLE	(_AT(pmdval_t, 1) << 2)
 #define PMD_SECT_CACHEABLE	(_AT(pmdval_t, 1) << 3)
 #define PMD_SECT_XN		(_AT(pmdval_t, 1) << 4)		/* v6 */
@@ -85,6 +93,11 @@
  * + Level 2 descriptor (PTE)
  *   - common
  */
+/*!!C -------------------------------------------------
+ * Level 2 Entry 의 마지막 2 bit 의 값에 따라서
+ * Fault 일지, Large Page 를 가리킬지, Small Page 를
+ * 가리킬지를 나타낸다.
+ *----------------------------------------------------*/
 #define PTE_TYPE_MASK		(_AT(pteval_t, 3) << 0)
 #define PTE_TYPE_FAULT		(_AT(pteval_t, 0) << 0)
 #define PTE_TYPE_LARGE		(_AT(pteval_t, 1) << 0)
