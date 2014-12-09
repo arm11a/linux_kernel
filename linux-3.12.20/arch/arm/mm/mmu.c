@@ -709,13 +709,16 @@ static void __init __map_init_section(pmd_t *pmd, unsigned long addr,
 #endif
     /*!!C -------------------------------------------------
      * addr ~ end 에 해당하는 pmd entry 들을 phys | prot_sect 값으로
-     * 설정한다.
+     * 설정한다. 이게 곧 mapping 작업이다.
      *----------------------------------------------------*/
 	do {
 		*pmd = __pmd(phys | type->prot_sect);
 		phys += SECTION_SIZE;
 	} while (pmd++, addr += SECTION_SIZE, addr != end);
 
+    /*!!C -------------------------------------------------
+     * 수정된 내용을 메모리에 반영 
+     *----------------------------------------------------*/
 	flush_pmd_entry(p);
 }
 
@@ -742,10 +745,14 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
             /*!!C -------------------------------------------------
              * 우리는 prot_sect 가 설정되어 있고, addr/next/phys 가
              * section boundary 로 align 되어 있다고 볼 수 있으므로
-             * 여기를 탈까 ?
+             * 여기를 탈까 ? -> yes
              *----------------------------------------------------*/
 			__map_init_section(pmd, addr, next, phys, type);
 		} else {
+            /*!!C -------------------------------------------------
+             * prot_sect 에 Section 설정이 안되어 있거나,
+             * section 단위로 align 안되어 있으면 2 level 을 타도록.
+             *----------------------------------------------------*/
 			alloc_init_pte(pmd, addr, next,
 						__phys_to_pfn(phys), type);
 		}
@@ -845,6 +852,11 @@ static void __init create_36bit_mapping(struct map_desc *md,
  * offsets, and we take full advantage of sections and
  * supersections.
  */
+/*!!C -------------------------------------------------
+ * 인자로 넘어온 map_desc 로 표현되는 메모리 영역에 대해
+ * pgd 부터 pte 까지 page table entry 들을 map_desc.type 에
+ * 맞는 mem_types 정보로 설정하는 작업 
+ *----------------------------------------------------*/
 static void __init create_mapping(struct map_desc *md)
 {
 	unsigned long addr, length, end;
@@ -900,9 +912,9 @@ static void __init create_mapping(struct map_desc *md)
      *----------------------------------------------------*/
 	length = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
 
-    /*!!Q -------------------------------------------------
-     * type->prot_l1 == 0 이면서 addr, phys, length 가 모두
-     * section size 로 align 되어 있지 않으면 
+    /*!!C -------------------------------------------------
+     * type->prot_l1 == 0 이고, 즉 section 으로 사용하려고 하면서 
+     * addr, phys, length 가 모두 section size 로 align 되어 있지 않으면 
      *----------------------------------------------------*/
 	if (type->prot_l1 == 0 && ((addr | phys | length) & ~SECTION_MASK)) {
 		printk(KERN_WARNING "BUG: map for 0x%08llx at 0x%08lx can not "
@@ -911,7 +923,7 @@ static void __init create_mapping(struct map_desc *md)
 		return;
 	}
 
-    /*!!Q -------------------------------------------------
+    /*!!C -------------------------------------------------
      * 인자로 넘어온 memory 영역을 cover 하는 pgd entry 들을
      * 구하려면 일단 시작 주소에 해당하는 pgd entry 를 구해야지. -> pgd
      * (인자로 넘어온 memory 영역은 여러개의 pgd entry 가
@@ -931,8 +943,9 @@ static void __init create_mapping(struct map_desc *md)
 		unsigned long next = pgd_addr_end(addr, end);
 
         /*!!C -------------------------------------------------
-         * pud(pgd) 하나를 할당해서 초기화하는 것 같은데
-         * 함수 depth 가 죽음이네... 어렵다...
+         * pgd entry 하나에 대한 설정 작업 
+         *   -> pgd 가 하나라면 section 을 사용할 때는 1 개의 pmd
+         *   -> section 을 사용하지 않는다면 pte 할당하고 설정작업 
          *
          * pgd  : addr 의 page directory offset
          * addr : 2 MB 씩 이동하는 시작주소 
@@ -1424,8 +1437,14 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	 */
 	vectors = early_alloc(PAGE_SIZE * 2);
 
+    /*!!C -------------------------------------------------
+     * 할당한 8 KB 에 
+     *----------------------------------------------------*/
 	early_trap_init(vectors);
 
+    /*!!C -------------------------------------------------
+     * VMALLOC_START 윗부분에 대한 page table entry 모두 clear
+     *----------------------------------------------------*/
 	for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
 		pmd_clear(pmd_off_k(addr));
 
@@ -1551,8 +1570,8 @@ static void __init map_lowmem(void)
 		map.type = MT_MEMORY;
 
         /*!!C -------------------------------------------------
-         * 선택된 low memory region 에 대해 page directory 를
-         * MT_MEMORY type 으로 entry 만들고 초기화 ?
+         * 선택된 low memory region 을 담당하는 page table entry 를
+         * MT_MEMORY type 에 근거하여 설정하는 작업 
          *----------------------------------------------------*/
 		create_mapping(&map);
 	}
@@ -1608,15 +1627,9 @@ void __init paging_init(const struct machine_desc *mdesc)
      *    2048 entry      512 entry
      *    PGDIR_SHIFT = PMD_SHIFT
      * 
-     * 그런데 !!!
-     * 2-level 에서는 pgd 만 있고 pmd 를 그럼 안사용하나 ?
-     * 아니다. pgd 는 2MB 단위로 사용하고, PMD는 1MB 단위로 사용한다.
-     * PGD를 section 2개 (2MB)에 대한 pointer로 사용하고 PMD는
-     * 각각 1MB section을 가리킨다.
-     * 결국 PGD와 PMD 모두 L1 descriptor 관리에 사용된다.
-     *
      * page table 관련 iamroot 의 내용 쭈욱 읽어볼 것.
      *  http://www.iamroot.org/xe/Kernel_10_ARM/186592#comment_186781
+     *  http://studyfoss.egloos.com/viewer/5008142
      *----------------------------------------------------*/
 	prepare_page_table();
 
@@ -1624,14 +1637,10 @@ void __init paging_init(const struct machine_desc *mdesc)
     /*!!C -------------------------------------------------
      * 참고 !!
      *
-     * 그런데, 이거 arch/arm/include/asm/pgtable-2level.h 에
-     * 있는 H/W PTE 같은걸 개념 이해 아직 못했음. !!
-     * 1024 * 1024 * 4096 이면 4 G 를 커버 가능한데,
-     * pgd 는 왜 4096 개의 entry 를 가질까 ? 1024 개면 되는거 아냐 ?
+     * arch/arm/include/asm/pgtable-2level.h 에 있는 설명처럼
+     * ARM H/W 페이지 테이블(2-Level)과 Linux 페이지 테이블(3-Level)을
+     * 함께 고려한 그림을 완성해보자.
      * 
-     * 아하 !! 
-     *  http://studyfoss.egloos.com/viewer/5008142
-     *
      *   16 KB = 8 byte * 2048 entry
      *
      *   11 bit (2048)     9 bit (512)    12 bit (4096)
@@ -1668,7 +1677,13 @@ void __init paging_init(const struct machine_desc *mdesc)
      *----------------------------------------------------*/
 	map_lowmem();
 
+    /*!!C -------------------------------------------------
+     * kernel parameter 로 cma= .. 과 같이 설정되어야 
+     * 사용하게 되는데, CMA(Contiguous Memory Allocation)는
+     * 현재 사용되지 않는 기법이라고 하고 우리도 사용안함. pass
+     *----------------------------------------------------*/
 	dma_contiguous_remap();
+
 	devicemaps_init(mdesc);
 	kmap_init();
 	tcm_init();

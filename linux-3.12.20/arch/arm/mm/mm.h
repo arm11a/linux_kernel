@@ -44,7 +44,19 @@ static inline pmd_t *pmd_off_k(unsigned long virt)
 struct mem_type {
 	pteval_t prot_pte;
 	pteval_t prot_pte_s2;
+
+    /*!!C -------------------------------------------------
+     * section 이나 supersection 을 사용하지 않고 2 level
+     * page table 을 사용하려고 할 때 설정 
+     *----------------------------------------------------*/
 	pmdval_t prot_l1;
+
+    /*!!C -------------------------------------------------
+     * section 으로 사용하려면 PMD_TYPE_SECT 값이 
+     * 반드시 들어있어야 함.
+     * (그 값이 entry 의 최하위 2 bit이고, 이를 mmu 가
+     * 주소 변환 시 사용한다.)
+     *----------------------------------------------------*/
 	pmdval_t prot_sect;
 	unsigned int domain;
 };

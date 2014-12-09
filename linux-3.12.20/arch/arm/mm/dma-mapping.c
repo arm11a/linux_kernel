@@ -412,6 +412,18 @@ void __init dma_contiguous_early_fixup(phys_addr_t base, unsigned long size)
 void __init dma_contiguous_remap(void)
 {
 	int i;
+
+    /*!!C -------------------------------------------------
+     * arm_memblock_init()->dma_contiguous_reserve() 에서 
+     * drivers/base/dma-contiguous.c 파일의 
+     * dma_contiguous_reserve_area 함수호출을 건너 뛰었기 때문에 
+     * dma_contiguous_early_fixup() 함수 호출도 건너뛰게 되고,
+     * 이 때문에 dma_mmu_remap_num 값은 0 인 상태이다.
+     * 
+     * 즉, 우리는 CMA(Contiguous Memory Allocation)을 사용하지 않는다.
+     * 이는 프로그램을 연속된 메모리 공간 내에 할당하는 기법.
+     * -> 문제가 있어서 현재는 사용하지 않는 기법이라고 함.
+     *----------------------------------------------------*/
 	for (i = 0; i < dma_mmu_remap_num; i++) {
 		phys_addr_t start = dma_mmu_remap[i].base;
 		phys_addr_t end = start + dma_mmu_remap[i].size;

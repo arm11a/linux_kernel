@@ -110,6 +110,11 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
 
 	pr_debug("%s(limit %08lx)\n", __func__, (unsigned long)limit);
 
+    /*!!C -------------------------------------------------
+     * cma= 와 같이 global CMA 영역을 kernel parameter 로
+     * 설정했을 때만(size_cmdline != -1) dma_contiguous_reserve_area 호출.
+     * 우린 사용안하므로 아래 모두 통과 !
+     *----------------------------------------------------*/
 	if (size_cmdline != -1) {
 		selected_size = size_cmdline;
 	} else {

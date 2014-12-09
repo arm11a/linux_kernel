@@ -401,6 +401,8 @@ void __init arm_memblock_init(struct meminfo *mi,
 	/* reserve any platform specific memblock areas */
     /*!!Q -------------------------------------------------
      * 이 reserve 함수는 언제 어디서 등록해주는지 모르겠네...
+     * -> 우리는 exynos 이므로 arch/arm/mach-exynos/mach-exynos5-dt.c
+     *    파일의 DT_MACHINE_START 참조 
      *----------------------------------------------------*/
 	if (mdesc->reserve)
 		mdesc->reserve();

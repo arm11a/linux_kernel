@@ -15,7 +15,7 @@
 #include <asm/io.h>
 
 /*!!C -------------------------------------------------
-* 하나의 memory region 에 대한 description 정보 저장 
+* 하나의 memory region 에 대한 map description 정보 저장 
 *----------------------------------------------------*/
 struct map_desc {
 	unsigned long virtual;

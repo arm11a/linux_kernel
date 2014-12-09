@@ -842,6 +842,15 @@ void __init trap_init(void)
 }
 
 #ifdef CONFIG_KUSER_HELPERS
+/*!!C -------------------------------------------------
+ * kuser helper 가 뭐지 ?
+ *
+ * Document/arm/kernel_user_helpers.txt 의 앞쪽을 읽어보면...
+ * - user space 에서 direct 로 사용할 수 있는 커널의 특정 영역
+ * - 효율성은 좋지만 커널이 경고없이 변경해도 대책없겠지.
+ * 
+ * http://iamroot.org/wiki/doku.php?id=%EC%8A%A4%ED%84%B0%EB%94%94:arm_kernel_%EC%8A%A4%ED%84%B0%EB%94%94_10%EC%B0%A8_full_%EB%B0%94%EB%A1%9C%EA%B0%80%EA%B8%B0
+ *----------------------------------------------------*/
 static void __init kuser_init(void *vectors)
 {
 	extern char __kuser_helper_start[], __kuser_helper_end[];
@@ -886,7 +895,14 @@ void __init early_trap_init(void *vectors_base)
 	 * into the vector page, mapped at 0xffff0000, and ensure these
 	 * are visible to the instruction stream.
 	 */
+    /*!!C -------------------------------------------------
+     * 초반 4 KB 에는 vector copy
+     *----------------------------------------------------*/
 	memcpy((void *)vectors, __vectors_start, __vectors_end - __vectors_start);
+
+    /*!!C -------------------------------------------------
+     *후반 4 KB 에는 stub copy
+     *----------------------------------------------------*/
 	memcpy((void *)vectors + 0x1000, __stubs_start, __stubs_end - __stubs_start);
 
 	kuser_init(vectors_base);
