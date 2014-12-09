@@ -871,6 +871,9 @@ static void __init kuser_init(void *vectors)
 }
 #endif
 
+/*!!C -------------------------------------------------
+ * interrupt vector table 초기화 
+ *----------------------------------------------------*/
 void __init early_trap_init(void *vectors_base)
 {
 #ifndef CONFIG_CPU_V7M
@@ -901,14 +904,32 @@ void __init early_trap_init(void *vectors_base)
 	memcpy((void *)vectors, __vectors_start, __vectors_end - __vectors_start);
 
     /*!!C -------------------------------------------------
-     *후반 4 KB 에는 stub copy
+     * 후반 4 KB 에는 stub copy
      *----------------------------------------------------*/
 	memcpy((void *)vectors + 0x1000, __stubs_start, __stubs_end - __stubs_start);
 
+    /*!!C -------------------------------------------------
+     * vectors + 0x1000 바로 아래에 
+     * __kuser_helper_start~__kuser_helper_end 정보 copy
+     *----------------------------------------------------*/
 	kuser_init(vectors_base);
 
+    /*!!C -------------------------------------------------
+     * 변경된 vector table 영역 flush 
+     *----------------------------------------------------*/
 	flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
+
+    /*!!C -------------------------------------------------
+     * current thread 에 대해 DOMAIN_USER 자리의 type 을
+     * DOMAIN_CLIENT 로 설정함.
+     * 이 말은 이 thread 가 메모리 접근 시 page table entry 의
+     * domain field 에 DOMAIN_USER 라고 설정되어 있으면,
+     * CP15:c3:c0 레지스터의 DOMAIN_USER 자리의 값이 
+     * DOMAIN_CLIENT 가 설정되므로 다시 pte 의 AP 필드를
+     * 통해 메모리 접근 시 권한을 검사하겠다는 의미임.
+     *----------------------------------------------------*/
 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
+
 #else /* ifndef CONFIG_CPU_V7M */
 	/*
 	 * on V7-M there is no need to copy the vector table to a dedicated

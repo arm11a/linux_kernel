@@ -60,6 +60,10 @@
 #ifndef __ASSEMBLY__
 
 #ifdef CONFIG_CPU_USE_DOMAINS
+/*!!C -------------------------------------------------
+ * domain 에 대해 복습 필요 
+ * http://stackcanary.com/?p=632
+ *----------------------------------------------------*/
 static inline void set_domain(unsigned val)
 {
 	asm volatile(
@@ -68,12 +72,24 @@ static inline void set_domain(unsigned val)
 	isb();
 }
 
+/*!!C -------------------------------------------------
+ * http://stackcanary.com/?p=632 복습 후 아래 코드를 봐야 함.
+ *
+ * 아하!!!
+ * thread 마다 domain 설정이 다른 것임.
+ * page table entry 의 domain 필드를 통해 해당 thread 의
+ * domain 설정(cp15)을 조회하여 client 일 경우는 entry 의
+ * AP 필드를 또 조회하게 됨.
+ * CP15:c3:c0 레지스터에 설정된 domain 은 현재 thread 의
+ * thread_info.cpu_domain 과 같은 값이다.
+ * 이는 context switch 될 때마다 바꾸어주어야할 값일 듯.
+ *----------------------------------------------------*/
 #define modify_domain(dom,type)					\
 	do {							\
 	struct thread_info *thread = current_thread_info();	\
 	unsigned int domain = thread->cpu_domain;		\
-	domain &= ~domain_val(dom, DOMAIN_MANAGER);		\
-	thread->cpu_domain = domain | domain_val(dom, type);	\
+	domain &= ~domain_val(dom, DOMAIN_MANAGER);		\  /*!!C domain 에서 clear */
+	thread->cpu_domain = domain | domain_val(dom, type);	\  /*!!C 주어진 type 으로 설정 */
 	set_domain(thread->cpu_domain);				\
 	} while (0)
 

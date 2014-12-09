@@ -36,8 +36,26 @@ struct memblock_type {
 
 struct memblock {
 	phys_addr_t current_limit;
-	struct memblock_type memory;   /*!!C 물리적으로 쓸수 있는 영역 설정 */
-	struct memblock_type reserved; /*!!C 사용하지 말아야할 부분 설정 - kernel 이 사용하는 부분 등 */
+
+    /*!!C -------------------------------------------------
+     * 물리적으로 쓸수 있는 영역 설정.
+     * 여기에는 물리적인 메모리 덩어리들(region) 정보가 설정되어 있음.
+     * 메모리가 필요할 때는 여기에서 짤라서 사용하면 되는 것.
+     * 다만 이 덩어리안에는 reserved 영역들이 있는데
+     * 이 부분들은 할당하여 사용하면 안되는 page table, kernel image 
+     * dtb 등을 위해 예약된 공간이다.
+     *----------------------------------------------------*/
+	struct memblock_type memory;
+
+    /*!!C -------------------------------------------------
+     * 사용하지 말아야할 부분 설정.
+     * kernel, page table, dtb 등을 위해 예약해둔 공간에 대한
+     * 정보가 설정된다. 또한 vector table 등 신규로 할당되는
+     * 메모리 영역도 여기에 등록된다.
+     * 이 영역들도 물리메모리이므로 물론 위의 memory region 들에
+     * 속하게 된다.
+     *----------------------------------------------------*/
+	struct memblock_type reserved;
 };
 
 extern struct memblock memblock;
@@ -114,6 +132,16 @@ void __next_free_mem_range_rev(u64 *idx, int nid, phys_addr_t *out_start,
  * Walks over free (memory && !reserved) areas of memblock in reverse
  * order.  Available as soon as memblock is initialized.
  */
+/*!!C -------------------------------------------------
+ * 이 for each 문은 looping 을 돌면서 p_start 와 p_end 를
+ * 얻어내는 매크로이다. free memblock 을 찾아서 start 와 
+ * end 를 찾아내는 것이다.
+ * for 문 처음 시작할 때 __next_free_mem_range_rev 를 
+ * 호출하고, 매번 looping 하면서 같은 __next_free_mem_range_rev 
+ * 함수를 호출한다.
+ * 이 함수 내에서 다음 looping 을 결정하는 i 의 값이 결정된다.
+ * i 값은 메모리를 할당할 영역을 찾으면 변경된다.
+ *----------------------------------------------------*/
 #define for_each_free_mem_range_reverse(i, nid, p_start, p_end, p_nid)	\
 	for (i = (u64)ULLONG_MAX,					\
 	     __next_free_mem_range_rev(&i, nid, p_start, p_end, p_nid);	\

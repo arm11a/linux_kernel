@@ -41,6 +41,10 @@
 
 #ifndef __ASSEMBLY__
 
+/*!!C -------------------------------------------------
+ * cr_alignment 는 __mmap_switched 에서 control register 
+ * 값을 설정한 후 start_kernel 을 호출했었다.
+ *----------------------------------------------------*/
 #if __LINUX_ARM_ARCH__ >= 4
 #define vectors_high()	(cr_alignment & CR_V)
 #else

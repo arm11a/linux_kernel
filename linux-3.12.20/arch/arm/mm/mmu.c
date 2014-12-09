@@ -855,7 +855,9 @@ static void __init create_36bit_mapping(struct map_desc *md,
 /*!!C -------------------------------------------------
  * 인자로 넘어온 map_desc 로 표현되는 메모리 영역에 대해
  * pgd 부터 pte 까지 page table entry 들을 map_desc.type 에
- * 맞는 mem_types 정보로 설정하는 작업 
+ * 맞는 mem_types 정보로 설정하는 작업.
+ * 주어지는 물리 메모리 영역을 map_desc.virtual 주소로
+ * mapping 하는 작업이다.
  *----------------------------------------------------*/
 static void __init create_mapping(struct map_desc *md)
 {
@@ -948,7 +950,7 @@ static void __init create_mapping(struct map_desc *md)
          *   -> section 을 사용하지 않는다면 pte 할당하고 설정작업 
          *
          * pgd  : addr 의 page directory offset
-         * addr : 2 MB 씩 이동하는 시작주소 
+         * addr : 2 MB 씩 이동하는 시작주소 (mapping 할 가상주소)
          * next : addr 의 다음 2 MB 시작 주소 
          * phys : 현재 addr 의 물리주소 
          * type : MT_MEMORY 에 해당하는 mem_types
@@ -1323,6 +1325,9 @@ void __init sanity_check_meminfo(void)
 	if (!memblock_limit)
 		memblock_limit = arm_lowmem_limit;
 
+    /*!!C -------------------------------------------------
+     * 이 memblock 의 끝(limit)을 current_limit 변수로 설정해둠.
+     *----------------------------------------------------*/
 	memblock_set_current_limit(memblock_limit);
 }
 
@@ -1435,10 +1440,14 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	/*
 	 * Allocate the vector page early.
 	 */
+    /*!!C -------------------------------------------------
+     * vector table 을 위해 2 page 를 memblock 에서 할당.
+     *----------------------------------------------------*/
 	vectors = early_alloc(PAGE_SIZE * 2);
 
     /*!!C -------------------------------------------------
-     * 할당한 8 KB 에 
+     * 할당한 8 KB 에 vector, kuser 정보등을 설정하고
+     * current_thread 의 domain 을 설정함.
      *----------------------------------------------------*/
 	early_trap_init(vectors);
 
@@ -1483,6 +1492,10 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	 * location (0xffff0000).  If we aren't using high-vectors, also
 	 * create a mapping at the low-vectors virtual address.
 	 */
+    /*!!C -------------------------------------------------
+     * 할당한 page 중 하나를 가상주소 0xffff0000 로 매핑하여
+     * MT_HIGH_VECTORS type 의 메모리로 pte 를 초기화함.
+     *----------------------------------------------------*/
 	map.pfn = __phys_to_pfn(virt_to_phys(vectors));
 	map.virtual = 0xffff0000;
 	map.length = PAGE_SIZE;
@@ -1493,6 +1506,11 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 #endif
 	create_mapping(&map);
 
+    /*!!C -------------------------------------------------
+     * control register 를 통해 vector table 이 0xffff0000 에
+     * 매핑하도록 설정되어 있지 않은 경우 low vector 로
+     * 0x00000000 가상주소로 매핑한다.
+     *----------------------------------------------------*/
 	if (!vectors_high()) {
 		map.virtual = 0;
 		map.length = PAGE_SIZE * 2;
@@ -1501,6 +1519,9 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	}
 
 	/* Now create a kernel read-only mapping */
+    /*!!C -------------------------------------------------
+     * 할당한 page 중 나머지 하나 mapping
+     *----------------------------------------------------*/
 	map.pfn += 1;
 	map.virtual = 0xffff0000 + PAGE_SIZE;
 	map.length = PAGE_SIZE;
@@ -1510,10 +1531,16 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	/*
 	 * Ask the machine support to map in the statically mapped devices.
 	 */
+    /*!!C -------------------------------------------------
+     * architecture 의존적인 mapped device 에 대한 메모리 영역에
+     * 대한 mapping 작업.
+     *----------------------------------------------------*/
 	if (mdesc->map_io)
-		mdesc->map_io();
+		mdesc->map_io();   /*!!C  exynos_init_io */
 	else
 		debug_ll_io_init();
+
+    /////// 여기 할 차례 
 	fill_pmd_gaps();
 
 	/* Reserve fixed i/o space in VMALLOC region */
@@ -1684,6 +1711,10 @@ void __init paging_init(const struct machine_desc *mdesc)
      *----------------------------------------------------*/
 	dma_contiguous_remap();
 
+    /*!!C -------------------------------------------------
+     * 벡터테이블용 메모리를 할당하고 매핑한 다음, 특정 영역의
+     * pgd 엔트리를 초기화한다.
+     *----------------------------------------------------*/
 	devicemaps_init(mdesc);
 	kmap_init();
 	tcm_init();

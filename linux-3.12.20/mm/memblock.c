@@ -103,6 +103,10 @@ phys_addr_t __init_memblock memblock_find_in_range_node(phys_addr_t start,
 	u64 i;
 
 	/* pump up @end */
+    /*!!C -------------------------------------------------
+     * current_limit 은 sanity_check_meminfo 에서 설정했음.
+     * 현재 memory block 의 끝 부분.
+     *----------------------------------------------------*/
 	if (end == MEMBLOCK_ALLOC_ACCESSIBLE)
 		end = memblock.current_limit;
 
@@ -110,13 +114,26 @@ phys_addr_t __init_memblock memblock_find_in_range_node(phys_addr_t start,
 	start = max_t(phys_addr_t, start, PAGE_SIZE);
 	end = max(start, end);
 
+    /*!!C -------------------------------------------------
+     * memblock 의 memory 와 reserve 영역을 고려하여 memory 중
+     * free mem 영역을 찾아서 그 영역에 대한 this_start, this_end 를 구한다.
+     *----------------------------------------------------*/
 	for_each_free_mem_range_reverse(i, nid, &this_start, &this_end, NULL) {
+        /*!!C -------------------------------------------------
+         * 구한 this_start, this_end 가 start~end 사이이면 구한 그대로 사용하고,
+         * this_start < start 이면 this_start = start
+         * this_end > end 이면 this_end = end
+         *----------------------------------------------------*/
 		this_start = clamp(this_start, start, end);
 		this_end = clamp(this_end, start, end);
 
 		if (this_end < size)
 			continue;
 
+        /*!!C -------------------------------------------------
+         * cand = candidate
+         * 할당한 메모리 위치를 리턴 
+         *----------------------------------------------------*/
 		cand = round_down(this_end - size, align);
 		if (cand >= this_start)
 			return cand;
@@ -690,6 +707,10 @@ void __init_memblock __next_free_mem_range(u64 *idx, int nid,
  *
  * Reverse of __next_free_mem_range().
  */
+/*!!C -------------------------------------------------
+ * 아래에 설명이 끝장으로 잘 나와 있음. (10 차 C 조 대단...)
+ * http://www.iamroot.org/xe/Kernel_10_ARM/186592#comment_186781
+ *----------------------------------------------------*/
 void __init_memblock __next_free_mem_range_rev(u64 *idx, int nid,
 					   phys_addr_t *out_start,
 					   phys_addr_t *out_end, int *out_nid)
@@ -699,23 +720,48 @@ void __init_memblock __next_free_mem_range_rev(u64 *idx, int nid,
 	int mi = *idx & 0xffffffff;
 	int ri = *idx >> 32;
 
+    /*!!C -------------------------------------------------
+     * for each 문의 첫 시작일 때 *idx = ULLONG_MAX 임.
+     * 다음에 들어올 때는 아래쪽에서 설정하는 *idx 값을 이용하여
+     * 바로 위에서 bit 연산으로 mi, ri 값을 뽑아냄.
+     *----------------------------------------------------*/
 	if (*idx == (u64)ULLONG_MAX) {
 		mi = mem->cnt - 1;
 		ri = rsv->cnt;
 	}
 
+    /*!!C -------------------------------------------------
+     * memblock 의 memory region 을 돌면서 reserve 영역을
+     * 제외하고 할당 가능한 영역을 찾음.
+     *----------------------------------------------------*/
 	for ( ; mi >= 0; mi--) {
 		struct memblock_region *m = &mem->regions[mi];
 		phys_addr_t m_start = m->base;
 		phys_addr_t m_end = m->base + m->size;
 
 		/* only memory regions are associated with nodes, check it */
+        /*!!C -------------------------------------------------
+         * 관련 노드가 아닐 때는 pass
+         *----------------------------------------------------*/
 		if (nid != MAX_NUMNODES && nid != memblock_get_region_node(m))
 			continue;
 
 		/* scan areas before each reservation for intersection */
 		for ( ; ri >= 0; ri--) {
+            /*!!C -------------------------------------------------
+             * ri 값이 rsv->cnt 값부터 들어옴.
+             *----------------------------------------------------*/
 			struct memblock_region *r = &rsv->regions[ri];
+
+            /*!!C -------------------------------------------------
+             * r[-1].size -> (r - 1).size
+             *
+             * 이렇게 한 이유는 ri 를 rsv->cnt 부터 looping 돌리기 위함.
+             * 즉, 첫번째 여기 들어오면 ri 값은 rsv->cnt 이기 때문에
+             * rsv->regions array 의 마지막 index + 1 값이 된다.
+             * 그냥 ri 값은 rsv->cnt - 1 부터 돌리면 될 것 같은데,
+             * 왜 이렇게 어렵게 했는지 이해가 안되네...
+             *----------------------------------------------------*/
 			phys_addr_t r_start = ri ? r[-1].base + r[-1].size : 0;
 			phys_addr_t r_end = ri < rsv->cnt ? r->base : ULLONG_MAX;
 
@@ -723,6 +769,9 @@ void __init_memblock __next_free_mem_range_rev(u64 *idx, int nid,
 			if (r_end <= m_start)
 				break;
 			/* if the two regions intersect, we're done */
+            /*!!C -------------------------------------------------
+             * r_end > m_start && m_end > r_start
+             *----------------------------------------------------*/
 			if (m_end > r_start) {
 				if (out_start)
 					*out_start = max(m_start, r_start);
@@ -731,6 +780,9 @@ void __init_memblock __next_free_mem_range_rev(u64 *idx, int nid,
 				if (out_nid)
 					*out_nid = memblock_get_region_node(m);
 
+                /*!!C -------------------------------------------------
+                 * for_each_free_mem_range_reverse 다음 looping 
+                 *----------------------------------------------------*/
 				if (m_start >= r_start)
 					mi--;
 				else
@@ -741,6 +793,9 @@ void __init_memblock __next_free_mem_range_rev(u64 *idx, int nid,
 		}
 	}
 
+    /*!!C -------------------------------------------------
+     * for_each_free_mem_range_reverse looping 끝냄 
+     *----------------------------------------------------*/
 	*idx = ULLONG_MAX;
 }
 
@@ -819,7 +874,16 @@ static phys_addr_t __init memblock_alloc_base_nid(phys_addr_t size,
 	/* align @size to avoid excessive fragmentation on reserved array */
 	size = round_up(size, align);
 
+    /*!!C -------------------------------------------------
+     * found = 새로 할당할 메모리 영역의 시작 주소 
+     *----------------------------------------------------*/
 	found = memblock_find_in_range_node(0, max_addr, size, align, nid);
+
+    /*!!C -------------------------------------------------
+     * 할당한 메모리 영역 found ~ found + size 을
+     * memblock 의 reserve region 에 추가.
+     * (이제 이 부분도 할당하면 안되는 reserve 영역으로 추가된 것임)
+     *----------------------------------------------------*/
 	if (found && !memblock_reserve(found, size))
 		return found;
 
