@@ -98,6 +98,11 @@ static int parse_one(char *param,
 
 	/* Find parameter */
 	for (i = 0; i < num_params; i++) {
+		/*!! 2014-12-13 처음에 들어올때는 params=NULL 로 들어오기 때문에
+		 * 해주는 것이 없지만 나중에는 params 의 값과 비교하여 이미 셋팅이
+		 * 되어 있는 것이 있는지 확인하여 있다면 유효성 검사를 한다. /proc/sys/vm/ 에 있는
+		 * parameter 들이 kernel_param 의 일종으로 예측!!
+		 */
 		if (parameq(param, params[i].name)) {
 			if (params[i].level < min_level
 			    || params[i].level > max_level)
@@ -109,6 +114,7 @@ static int parse_one(char *param,
 			pr_debug("handling %s with %p\n", param,
 				params[i].ops->set);
 			mutex_lock(&param_lock);
+			/*!! param callback 으로 val 을 param에 셋팅 */
 			err = params[i].ops->set(val, &params[i]);
 			mutex_unlock(&param_lock);
 			return err;
@@ -137,7 +143,7 @@ static char *next_arg(char *args, char **param, char **val)
 		in_quote = 1;
 		quoted = 1;
 	}
-
+	/*!!C '=' 가 몇번째 캐릭터인지를 찾는것이 이for 문의 역활*/ 
 	for (i = 0; args[i]; i++) {
 		if (isspace(args[i]) && !in_quote)
 			break;
@@ -153,25 +159,27 @@ static char *next_arg(char *args, char **param, char **val)
 	if (!equals)
 		*val = NULL;
 	else {
+		/*!!C "console\0ttySAC2,115200 init=/linuxrc" */
 		args[equals] = '\0';
+		/*!!C *val 은 ttySAC2 에 t 를 가르키고 있다.*/
 		*val = args + equals + 1;
 
 		/* Don't include quotes in value. */
 		if (**val == '"') {
-			(*val)++;
-			if (args[i-1] == '"')
+			(*val)++; /*!!C =앞뒤로 " 가 있으면 \0 으로 치환 */
+			if (args[i-1] == '"') 
 				args[i-1] = '\0';
 		}
-		if (quoted && args[i-1] == '"')
+		if (quoted && args[i-1] == '"') 
 			args[i-1] = '\0';
 	}
-
+	/*!!C 앞에서 = 가 \0 로 안바뀌는 경우가 있으면 여기서 \0로 변환 */
 	if (args[i]) {
 		args[i] = '\0';
 		next = args + i + 1;
 	} else
 		next = args + i;
-
+	/*!!C value 가 되는 부분을 return 한다. */
 	/* Chew up trailing spaces. */
 	return skip_spaces(next);
 }
@@ -189,14 +197,14 @@ int parse_args(const char *doing,
 
 	/* Chew leading spaces */
 	args = skip_spaces(args);
-
+	/*!!C bootargs = "console=ttySAC2,115200 init=/linuxrc"; */
 	if (*args)
 		pr_debug("doing %s, parsing ARGS: '%s'\n", doing, args);
 
 	while (*args) {
 		int ret;
 		int irq_was_disabled;
-
+		/*!!C 처음에 args는 ttySAC2,115200 init=/linuxrc 가 된다. */
 		args = next_arg(args, &param, &val);
 		irq_was_disabled = irqs_disabled();
 		ret = parse_one(param, val, doing, params, num,

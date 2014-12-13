@@ -43,7 +43,9 @@ static void generic_swap(void *a, void *b, int size)
  * O(n*n) worst-case behavior and extra memory requirements that make
  * it less suitable for kernel use.
  */
-
+/*!!C cmp_func() 실행하여 swap_func() 을 실행할지 결정한다.
+ * base를 기준으로 2134 --> 1234 방식으로 정렬해준다.
+ */
 void sort(void *base, size_t num, size_t size,
 	  int (*cmp_func)(const void *, const void *),
 	  void (*swap_func)(void *, void *, int size))

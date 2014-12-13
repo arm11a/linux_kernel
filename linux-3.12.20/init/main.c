@@ -159,7 +159,12 @@ __setup("reset_devices", set_reset_devices);
 static const char * argv_init[MAX_INIT_ARGS+2] = { "init", NULL, };
 const char * envp_init[MAX_INIT_ENVS+2] = { "HOME=/", "TERM=linux", NULL, };
 static const char *panic_later, *panic_param;
-
+/*!!C 
+ * /arch/arm/kernel/vmlinux.lds 파일에 정의되어 있다.
+ *  이 파일은 /arch/arm/kernel/vmlinux.lds.S 를 빌드하면 나오는 파일이다.
+ * /include/asm-generic/vmlinux.lds.h 파일에__setup_start ~ __setup_end 까지
+ * 영역이 나와 있다. But .h와 .S 중 어떤게 먼저인지 모르겠다.
+ */
 extern const struct obs_kernel_param __setup_start[], __setup_end[];
 
 static int __init obsolete_checksetup(char *line)
@@ -310,6 +315,7 @@ static int __init init_setup(char *str)
 		argv_init[i] = NULL;
 	return 1;
 }
+/*!!C init.c
 __setup("init=", init_setup);
 
 static int __init rdinit_setup(char *str)
@@ -396,10 +402,12 @@ static noinline void __init_refok rest_init(void)
 static int __init do_early_param(char *param, char *val, const char *unused)
 {
 	const struct obs_kernel_param *p;
-
+	/*!!C obs_kernel_param 의 내용은 printk.c 에 console_setup() 함수참조
+	 * (console_setup()이 * setup_func 가 된다.)
+	 */
 	for (p = __setup_start; p < __setup_end; p++) {
 		if ((p->early && parameq(param, p->str)) ||
-		    (strcmp(param, "console") == 0 &&
+		    (strcmp(param, "console") == 0 && 
 		     strcmp(p->str, "earlycon") == 0)
 		) {
 			if (p->setup_func(val) != 0)

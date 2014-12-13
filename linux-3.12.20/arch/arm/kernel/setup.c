@@ -1207,6 +1207,7 @@ void __init setup_arch(char **cmdline_p)
     /*!!C
       2014.12.06 일에 김건호가 여기까지 드라이빙했음
      */
+	/*!C 2014.12.13 시작 */
 	parse_early_param();
 
     /*!!C

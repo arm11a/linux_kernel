@@ -968,7 +968,13 @@ void __init debug_ll_io_init(void)
 	iotable_init(&map, 1);
 }
 #endif
-
+/*!!C 240<<20 은 240MByte 
+ * #define VMALLOC_END                  0xff000000UL
+ * #define VMALLOC_OFFSET               (8*1024*1024)
+ * vmalloc_min = (void *)(0xFF000000 - (240<<20) - 0x800000
+ *             = (void *)(0xFF000000 - (0xf000000) - 0x800000
+ *             = 0xEF800000
+*/
 static void * __initdata vmalloc_min =
 	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
 
@@ -1006,6 +1012,13 @@ void __init sanity_check_meminfo(void)
 {
 	phys_addr_t memblock_limit = 0;
 	int i, j, highmem = 0;
+	/*!!C vmalloc_min = 0xEF800000
+	 * 3G~ 3.896G 까지는 LowMem
+	 * 3.896~ 4G 까지는 HighMem 
+	 * vmalloc_limit 은 HighMem 의 가장 아랫부분(3.896G)의 물리주소를  의미한다.
+	 * vmalloc은 highmem에 메모리할당하는 것을 읨하고 VMALLOC_END 는 
+	 * HighMem 에 메모리를  할당할 수 있는 가장 윗부분의 경계를 의미한다.
+	 */
 	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1;
 
 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
@@ -1014,7 +1027,7 @@ void __init sanity_check_meminfo(void)
 
 		*bank = meminfo.bank[i];
 		size_limit = bank->size;
-
+		_
 		if (bank->start >= vmalloc_limit)
 			highmem = 1;
 		else
@@ -1070,7 +1083,9 @@ void __init sanity_check_meminfo(void)
 #endif
 		if (!bank->highmem) {
 			phys_addr_t bank_end = bank->start + bank->size;
-
+			/*!!C 
+			 * arm_lowmem_limit=lowmem 중에서 가장 높은 값.
+			 */
 			if (bank_end > arm_lowmem_limit)
 				arm_lowmem_limit = bank_end;
 
@@ -1118,7 +1133,8 @@ void __init sanity_check_meminfo(void)
 #endif
 	meminfo.nr_banks = j;
 	high_memory = __va(arm_lowmem_limit - 1) + 1;
-
+	
+	/*!!C 2014-12-13 여기까지 진행 */
 	/*
 	 * Round the memblock limit down to a section size.  This
 	 * helps to ensure that we will allocate memory from the

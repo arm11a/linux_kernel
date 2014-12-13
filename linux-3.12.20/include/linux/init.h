@@ -255,6 +255,14 @@ struct obs_kernel_param {
  * Force the alignment so the compiler doesn't space elements of the
  * obs_kernel_param "array" too far apart in .init.setup.
  */
+/*!!C 예제코드 
+ *  __setup("init=", init_setup); 인 경우아래처럼 된다. (from main.c)
+ * #define __setup_param("init", init_setup, init_setup, 0)
+ *    static const char __setup_str_init_setup[] = "init";
+ *    static struct obs_kernel_param __setup_init_setup = {
+ *                  __setup_str_init_setup, init_setup, 0 
+ *                  }
+*/
 #define __setup_param(str, unique_id, fn, early)			\
 	static const char __setup_str_##unique_id[] __initconst	\
 		__aligned(1) = str; \
@@ -302,14 +310,6 @@ void __init parse_early_options(char *cmdline);
 
 /* Don't use these in loadable modules, but some people do... */
 #define early_initcall(fn)		module_init(fn)
-#define core_initcall(fn)		module_init(fn)
-#define postcore_initcall(fn)		module_init(fn)
-#define arch_initcall(fn)		module_init(fn)
-#define subsys_initcall(fn)		module_init(fn)
-#define fs_initcall(fn)			module_init(fn)
-#define device_initcall(fn)		module_init(fn)
-#define late_initcall(fn)		module_init(fn)
-
 #define security_initcall(fn)		module_init(fn)
 
 /* Each module must use one module_init(). */

@@ -1755,6 +1755,9 @@ static int __add_preferred_console(char *name, int idx, char *options,
 	 *	See if this tty is not yet registered, and
 	 *	if we have a slot free.
 	 */
+	/*!!C console_cmdline 에 들어온 name 과 일치하는 것이 없으면
+	 * for 문을 빠져나가서 add 하게 된다.
+	 */
 	for (i = 0, c = console_cmdline;
 	     i < MAX_CMDLINECONSOLES && c->name[0];
 	     i++, c++) {
@@ -1778,6 +1781,7 @@ static int __add_preferred_console(char *name, int idx, char *options,
 /*
  * Set up a list of consoles.  Called from init/main.c
  */
+/*!!C do_early_param 에서 실행하고, str 은 dts 파일에서 ttySAC2,115200 로 가져왔다. */
 static int __init console_setup(char *str)
 {
 	char buf[sizeof(console_cmdline[0].name) + 4]; /* 4 for index */
@@ -1808,7 +1812,8 @@ static int __init console_setup(char *str)
 	for (s = buf; *s; s++)
 		if ((*s >= '0' && *s <= '9') || *s == ',')
 			break;
-	idx = simple_strtoul(s, NULL, 10);
+	idx = simple_strtoul(s, NULL, 10); /*!!C Str 타입의 
+					     문자를Unsigned long 타입 숫자로 변경*/
 	*s = 0;
 
 	__add_preferred_console(buf, idx, options, brl_options);
