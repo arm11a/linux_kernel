@@ -1094,6 +1094,10 @@ void __init sanity_check_meminfo(void)
 			bank->size = size_limit;
 		}
 #endif
+        /*!!C 
+         * 1. 이번 bank 가 전부 lowmem 에 속하는 경우 
+         * 2. 겹쳤고 분할된 첫번째 bank 가 lowmem 인 경우 
+         */
 		if (!bank->highmem) {
 			phys_addr_t bank_end = bank->start + bank->size;
 
@@ -1119,7 +1123,8 @@ void __init sanity_check_meminfo(void)
 			 */
 
 			/*!!C 
-			 * align 안된 첫번째 bank 를 찾아서 그것을 memblock_limit 으로 설정 
+			 * align 안된 첫번째 bank 를 찾아서 그것을 memblock_limit 으로 설정.
+             * align 된 경우라면 memblock_limit 이 설정되지 않을 것임.
 			 */
 			if (!memblock_limit) {
 				if (!IS_ALIGNED(bank->start, SECTION_SIZE))
@@ -1175,13 +1180,16 @@ void __init sanity_check_meminfo(void)
 	 * last full section, which should be mapped.
 	 */
     /*!!C 
-     * highmem 이 없을 경우에만 memblock_limit 이 설정되어 있다.
+     * align 되지 않은 lowmem bank 가 있을 경우 
      */
 	if (memblock_limit)
 		memblock_limit = round_down(memblock_limit, SECTION_SIZE);
 
     /*!!C 
+     * 1. 모든 lowmem 의 bank 들이 align 되어 있다.
+     * 2. 전부 highmem 이다.
      * memblock_limit <- lowmem 의 맨 위쪽 
+     * 우리 환경에서는 여기를 탈 것이다.
      */
 	if (!memblock_limit)
 		memblock_limit = arm_lowmem_limit;
