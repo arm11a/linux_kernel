@@ -1027,7 +1027,6 @@ void __init sanity_check_meminfo(void)
 
 		*bank = meminfo.bank[i];
 		size_limit = bank->size;
-		_
 		if (bank->start >= vmalloc_limit)
 			highmem = 1;
 		else
@@ -1040,20 +1039,34 @@ void __init sanity_check_meminfo(void)
 		 * Split those memory banks which are partially overlapping
 		 * the vmalloc area greatly simplifying things later.
 		 */
+
 		if (!highmem && bank->size > size_limit) {
+        /*!!C
+         * memory bank 가 highmem 경계와 걸쳐 있는 경우 
+         */
 			if (meminfo.nr_banks >= NR_BANKS) {
 				printk(KERN_CRIT "NR_BANKS too low, "
 						 "ignoring high memory\n");
 			} else {
+                /*!!C
+                 * 경계를 걸쳐있는 경우는 하나의 memory bank 를
+                 * 추가해야 하므로 맨 앞 array 한자리를 비운다. 
+                 */
 				memmove(bank + 1, bank,
 					(meminfo.nr_banks - i) * sizeof(*bank));
 				meminfo.nr_banks++;
 				i++;
+                /*!!C
+                 * highmem 영역에 대한 설정 
+                 */
 				bank[1].size -= size_limit;
 				bank[1].start = vmalloc_limit;
 				bank[1].highmem = highmem = 1;
 				j++;
 			}
+            /*!!C
+             * lowmem 영역에 대한 설정 
+             */
 			bank->size = size_limit;
 		}
 #else
@@ -1083,8 +1096,10 @@ void __init sanity_check_meminfo(void)
 #endif
 		if (!bank->highmem) {
 			phys_addr_t bank_end = bank->start + bank->size;
+
 			/*!!C 
 			 * arm_lowmem_limit=lowmem 중에서 가장 높은 값.
+             * lowmem 영역에 속하는 memory bank 중에서 가장 높은 end 값 
 			 */
 			if (bank_end > arm_lowmem_limit)
 				arm_lowmem_limit = bank_end;
@@ -1102,6 +1117,10 @@ void __init sanity_check_meminfo(void)
 			 * allocated when mapping the start of bank 0, which
 			 * occurs before any free memory is mapped.
 			 */
+
+			/*!!C 
+			 * align 안된 첫번째 bank 를 찾아서 그것을 memblock_limit 으로 설정 
+			 */
 			if (!memblock_limit) {
 				if (!IS_ALIGNED(bank->start, SECTION_SIZE))
 					memblock_limit = bank->start;
@@ -1112,6 +1131,9 @@ void __init sanity_check_meminfo(void)
 		j++;
 	}
 #ifdef CONFIG_HIGHMEM
+    /*!!C 
+     * highmem 에 속하는 memory bank 가 존재한다면 
+     */
 	if (highmem) {
 		const char *reason = NULL;
 
@@ -1126,22 +1148,41 @@ void __init sanity_check_meminfo(void)
 		if (reason) {
 			printk(KERN_CRIT "HIGHMEM is not supported %s, ignoring high memory\n",
 				reason);
+            /*!!C
+             * bank 들의 array 끝쪽으로 highmem 들이 몰리게 되어 있다.
+             * 그래서, 뒷부분의 highmem 요소들은 건너뛴다.
+             */
 			while (j > 0 && meminfo.bank[j - 1].highmem)
 				j--;
 		}
 	}
 #endif
+
+    /*!!Q
+     * highmem 을 건너뛴 j 값이 곧 nr_banks 값이 된다.
+     * cache_is_vipt_aliasing 인 경우만 j 값이 줄었을 것임.
+     *
+     * 우리의 dts memory 설정환경에 의하면
+     * high_memory = vmalloc_min 이 아닌가 ?
+     */
 	meminfo.nr_banks = j;
 	high_memory = __va(arm_lowmem_limit - 1) + 1;
-	
+
 	/*!!C 2014-12-13 여기까지 진행 */
 	/*
 	 * Round the memblock limit down to a section size.  This
 	 * helps to ensure that we will allocate memory from the
 	 * last full section, which should be mapped.
 	 */
+    /*!!C 
+     * highmem 이 없을 경우에만 memblock_limit 이 설정되어 있다.
+     */
 	if (memblock_limit)
 		memblock_limit = round_down(memblock_limit, SECTION_SIZE);
+
+    /*!!C 
+     * memblock_limit <- lowmem 의 맨 위쪽 
+     */
 	if (!memblock_limit)
 		memblock_limit = arm_lowmem_limit;
 
