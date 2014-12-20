@@ -25,6 +25,9 @@ static struct memblock_region memblock_reserved_init_regions[INIT_MEMBLOCK_REGIO
 
 struct memblock memblock __initdata_memblock = {
 	.memory.regions		= memblock_memory_init_regions,
+    /*!!Q 
+     * 왜 cnt 를 1 로 처음에 초기화할까 ? 헷갈리게...
+     */
 	.memory.cnt		= 1,	/* empty dummy entry */
 	.memory.max		= INIT_MEMBLOCK_REGIONS,
 
@@ -361,11 +364,23 @@ static void __init_memblock memblock_insert_region(struct memblock_type *type,
  * RETURNS:
  * 0 on success, -errno on failure.
  */
+/*!!C 
+ * base : 이번에 처리할 bank 의 base 
+ * size : 이번에 처리할 bank 의 size 
+ *
+ * 이 함수는 mem bank 가 sort 된 뒤에만 호출되는 것이 아니라
+ * 기존 region 과 겹치는 memory base 와 size 값으로 add 요청이
+ * 올 수도 있다는 것을 명심할 것 !!
+ */
 static int __init_memblock memblock_add_region(struct memblock_type *type,
 				phys_addr_t base, phys_addr_t size, int nid)
 {
 	bool insert = false;
 	phys_addr_t obase = base;
+    /*!!C 
+     * bank 의 size 값을 unsigned long long max 값을 고려하여
+     * 이를 넘지 못하게 조정 
+     */
 	phys_addr_t end = base + memblock_cap_size(base, &size);
 	int i, nr_new;
 
@@ -373,6 +388,10 @@ static int __init_memblock memblock_add_region(struct memblock_type *type,
 		return 0;
 
 	/* special case for empty array */
+    /*!!Q 
+     * 왜 이런 예외처리가 필요한지 모르겠지만,
+     * 맨처음 진짜 empty 상태를 구분할 필요가 있나보다.
+     */
 	if (type->regions[0].size == 0) {
 		WARN_ON(type->cnt != 1 || type->total_size);
 		type->regions[0].base = base;
@@ -392,6 +411,11 @@ repeat:
 
 	for (i = 0; i < type->cnt; i++) {
 		struct memblock_region *rgn = &type->regions[i];
+
+        /*!!C 
+         * base, size 와 구분하여 이번 for 문에서 사용할 base 와 
+         * size 는 rbase 와 rend
+         */
 		phys_addr_t rbase = rgn->base;
 		phys_addr_t rend = rbase + rgn->size;
 
@@ -399,10 +423,17 @@ repeat:
 			break;
 		if (rend <= base)
 			continue;
+
 		/*
 		 * @rgn overlaps.  If it separates the lower part of new
 		 * area, insert that portion.
 		 */
+        /*!!C 
+         * rbase 가 base 보다 크다는 것은 이번에 add 요청받은
+         * 영역이 기존의 region 과 겹칠 수 있는 경우이다.
+         * 이 경우는 nr_new 갯수만 올리고 insert 는 아직 0 이므로
+         * 처음에는 insert 하지 않는다.
+         */
 		if (rbase > base) {
 			nr_new++;
 			if (insert)
@@ -414,6 +445,10 @@ repeat:
 	}
 
 	/* insert the remaining portion */
+    /*!!C 
+     * 겹치지 않는 경우는 위의 for 문은 중간에 continue 부분으로
+     * 빠져나오고 여기를 통해 insert 하게 된다.
+     */
 	if (base < end) {
 		nr_new++;
 		if (insert)
@@ -425,6 +460,10 @@ repeat:
 	 * insertions; otherwise, merge and return.
 	 */
 	if (!insert) {
+        /*!!C 
+         * 겹치는 부분들이 있어서 위에서 nr_new 값이 증가하였다면,
+         * max 값을 넘을 수 있으므로 공간을 추가할당해야 한다.
+         */
 		while (type->cnt + nr_new > type->max)
 			if (memblock_double_array(type, obase, size) < 0)
 				return -ENOMEM;
@@ -434,6 +473,10 @@ repeat:
 		memblock_merge_regions(type);
 		return 0;
 	}
+    /*!!C 
+     * 20141220
+     * 다음주에는 memblock_insert_region 함수부터 봐야 함.
+     */
 }
 
 int __init_memblock memblock_add_node(phys_addr_t base, phys_addr_t size,
