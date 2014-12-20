@@ -110,6 +110,9 @@ phys_addr_t __init_memblock memblock_find_in_range_node(phys_addr_t start,
 		end = memblock.current_limit;
 
 	/* avoid allocating the first page */
+	/*!!C
+	 * max_t매크로는 서로다른 타입의 두 값을 type인자로 casting하여 비교할때 사용.
+	 */
 	start = max_t(phys_addr_t, start, PAGE_SIZE);
 	end = max(start, end);
 
@@ -200,10 +203,13 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
 	phys_addr_t old_size, new_size, addr;
 	int use_slab = slab_is_available();
 	int *in_slab;
-
+ 
 	/* We don't allow resizing until we know about the reserved regions
 	 * of memory that aren't suitable for allocation
 	 */
+	/*!!C
+	 * 이후에 memblock_allow_resize함수가 호출된 이후에 이 조건에 걸리지 않음 
+	 * */
 	if (!memblock_can_resize)
 		return -1;
 
@@ -214,10 +220,17 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
 	 * We need to allocated new one align to PAGE_SIZE,
 	 *   so we can free them completely later.
 	 */
+	/*!!C
+	 * 위의 주석 내용처럼 size를 align하는 이유는 완전한 free를 하기 위함이다.  
+	 * */
 	old_alloc_size = PAGE_ALIGN(old_size);
 	new_alloc_size = PAGE_ALIGN(new_size);
 
 	/* Retrieve the slab flag */
+	/*!!C
+	 * memblock double array 함수에 type의 인자로는 memory 또는 reserved타입밖에
+	 * 올 수 없으므로 이 if문에서 in_slab에 어떤 종류를 사용할지 정할 수 있다.
+	 * */
 	if (type == &memblock.memory)
 		in_slab = &memblock_memory_in_slab;
 	else
@@ -242,6 +255,12 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
 		if (type != &memblock.reserved)
 			new_area_start = new_area_size = 0;
 
+		/*!!C
+		 * 첫번째인자(start) : new_area_start + new_area_size = 0
+		 * 두번째인자(end) : sanity_check에서 설정한 memblock_current limit
+		 * 세번째인자(size) : 두배로 할당할 align된 new_allock_size
+		 * 네번째인자(align) : PAGE_SIZE
+		 */
 		addr = memblock_find_in_range(new_area_start + new_area_size,
 						memblock.current_limit,
 						new_alloc_size, PAGE_SIZE);
@@ -437,6 +456,10 @@ repeat:
 		if (rbase > base) {
 			nr_new++;
 			if (insert)
+			/*!!C 
+			 *앞에서 잡혀 있던 region과 이번에 요청받은 region이 겹칠 경우에서,
+			 *겹치는 앞부분을 할당해주는 부분
+			 */
 				memblock_insert_region(type, i++, base,
 						       rbase - base, nid);
 		}
@@ -446,8 +469,9 @@ repeat:
 
 	/* insert the remaining portion */
     /*!!C 
-     * 겹치지 않는 경우는 위의 for 문은 중간에 continue 부분으로
+     * 겹치지 않는 경우 위의 for 문은 중간에 continue 부분으로
      * 빠져나오고 여기를 통해 insert 하게 된다.
+     * region이 겹치지 않는 경우에도 이 부분에서 insert 처리된다. 
      */
 	if (base < end) {
 		nr_new++;
@@ -692,6 +716,15 @@ void __init_memblock __next_free_mem_range(u64 *idx, int nid,
  *
  * Reverse of __next_free_mem_range().
  */
+
+/*!!C
+ * 이 함수는 함수 이름 그대로 뒤에서 부터 memory region과 reserved region을 비교하며
+ * 사용할 수 있는 메모리 영역의 start와 end의 address를 얻어내는 함수이다.
+ * 
+ * 중요!!
+ * memory region은 물리적으로 쓸 수 있는 영역을 설정한 것이고,
+ * reserved region은 kernel이나 dtb에서 사용하는 영역으로 memory region으로 사용할 수 없는 부분을 의미합니다. 
+ */
 void __init_memblock __next_free_mem_range_rev(u64 *idx, int nid,
 					   phys_addr_t *out_start,
 					   phys_addr_t *out_end, int *out_nid)
@@ -706,6 +739,13 @@ void __init_memblock __next_free_mem_range_rev(u64 *idx, int nid,
 		ri = rsv->cnt;
 	}
 
+	/*!!C
+	 * 여기서 mi(memory index)는 cnt-1을 해서 정상 인덱스를 취하지만
+	 * ri(reserved index)는 -1을 하지 않고
+	 * ri를 사용하는 for문에서 [-1]에 접근해서 사용한다.
+	 * 이렇게 사용하는 이유는 그림으로 정리!!
+	 * case by case로 설명
+	 */
 	for ( ; mi >= 0; mi--) {
 		struct memblock_region *m = &mem->regions[mi];
 		phys_addr_t m_start = m->base;
@@ -744,6 +784,9 @@ void __init_memblock __next_free_mem_range_rev(u64 *idx, int nid,
 	}
 
 	*idx = ULLONG_MAX;
+	/*!!C
+	 * 2014-12-27 여기까지 진행하였습니다.
+	 */
 }
 
 #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
