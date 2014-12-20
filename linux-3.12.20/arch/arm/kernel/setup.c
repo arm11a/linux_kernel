@@ -1240,6 +1240,7 @@ void __init setup_arch(char **cmdline_p)
      *  kernel_param 또는 .init.setup section 에서 찾아서
      *  value 를 설정해준다.
      *  early param 에서는 .init.setup section 에만 작업한다.
+     *  결국 console 설정만 console_cmdline 에 설정해준다.
      *----------------------------------------------------*/
     /*!!C
       2014.12.06 일에 김건호가 여기까지 드라이빙했음
@@ -1249,8 +1250,8 @@ void __init setup_arch(char **cmdline_p)
     /*!!C -------------------------------------------------
      * cloudrain21
      *  setup_machine_fdt 내에서 cell 프로퍼티를 분석하여
-     *  meminfo 에 저장해둔 bank 정보들의 주소를 서로 비교하여
-     *  순서대로 sorting 한다.
+     *  meminfo 에 저장해둔 bank 정보들의 start 주소를
+     *  서로 비교하여 순서대로 sorting 한다.
      *  sort 류 함수의 사용방법 알아두자. (qsort)
      *----------------------------------------------------*/
 	sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);

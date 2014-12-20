@@ -310,6 +310,11 @@ static int __init init_setup(char *str)
 		argv_init[i] = NULL;
 	return 1;
 }
+/*!!C -------------------------------------------------
+ *  http://furmuwon.egloos.com/viewer/10646725
+ * 결국 이 매크로는 init=init_setup 을 .init.setup 에
+ * 넣는 작업이다.
+ *----------------------------------------------------*/
 __setup("init=", init_setup);
 
 static int __init rdinit_setup(char *str)
@@ -396,6 +401,7 @@ static noinline void __init_refok rest_init(void)
 /*!!C -------------------------------------------------
  * .init.setup section 을 검색하여 같은 항목이 있으면
  * setup_func 를 통해 값을 저장해준다. 
+ * arch/arm/kernel/vmlinux.lds
  *----------------------------------------------------*/
 static int __init do_early_param(char *param, char *val, const char *unused)
 {
@@ -406,6 +412,16 @@ static int __init do_early_param(char *param, char *val, const char *unused)
 		    (strcmp(param, "console") == 0 &&
 		     strcmp(p->str, "earlycon") == 0)
 		) {
+            /*!!C -------------------------------------------------
+             * include/linux/init.h 의 __setup_param 매크로 참고 
+             * /init/main.c 의 init_setup 함수 참고.
+             *----------------------------------------------------*/
+            /*!!C -------------------------------------------------
+             * kernel/printk/printk.c 의 setup 함수를 통해
+             * console_setup 함수를 fn 으로 등록했음.
+             * 그게 setup_func 함수임.
+             * 그 함수는 console_cmdline 에 설정한 것을 등록.
+             *----------------------------------------------------*/
 			if (p->setup_func(val) != 0)
 				pr_warn("Malformed early option '%s'\n", param);
 		}

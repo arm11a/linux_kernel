@@ -1760,6 +1760,9 @@ static int __add_preferred_console(char *name, int idx, char *options,
 	     i++, c++) {
 		if (strcmp(c->name, name) == 0 && c->index == idx) {
 			if (!brl_options)
+                /*!!C -------------------------------------------------
+                 * 찾았음 
+                 *----------------------------------------------------*/
 				selected_console = i;
 			return 0;
 		}
@@ -1768,6 +1771,10 @@ static int __add_preferred_console(char *name, int idx, char *options,
 		return -E2BIG;
 	if (!brl_options)
 		selected_console = i;
+
+    /*!!C -------------------------------------------------
+     * 신규 등록 
+     *----------------------------------------------------*/
 	strlcpy(c->name, name, sizeof(c->name));
 	c->options = options;
 	braille_set_options(c, brl_options);
@@ -1805,12 +1812,19 @@ static int __init console_setup(char *str)
 	if (!strcmp(str, "ttyb"))
 		strcpy(buf, "ttyS1");
 #endif
+    /*!!C -------------------------------------------------
+     * tty 이름에서 숫자 추출하여 idx 에 저장 
+     *----------------------------------------------------*/
 	for (s = buf; *s; s++)
 		if ((*s >= '0' && *s <= '9') || *s == ',')
 			break;
 	idx = simple_strtoul(s, NULL, 10);
 	*s = 0;
 
+    /*!!C -------------------------------------------------
+     * console= args 에 설정한 값이 console_cmdline 에
+     * 등록되어 있으면 그것을 리턴하고 신규이면 등록한다.
+     *----------------------------------------------------*/
 	__add_preferred_console(buf, idx, options, brl_options);
 	console_set_on_cmdline = 1;
 	return 1;
