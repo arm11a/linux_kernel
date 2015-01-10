@@ -98,6 +98,12 @@ static long __init_memblock memblock_overlaps_region(struct memblock_type *type,
  * RETURNS:
  * Found address on success, %0 on failure.
  */
+
+/*C!! 첫번째인자(start) : new_area_start + new_area_size = 0
+* 두번째인자(end) : sanity_check에서 설정한 memblock_current limit
+* 세번째인자(size) : 두배로 할당할 align된 new_allock_size
+* 네번째인자(align) : PAGE_SIZE
+*/
 phys_addr_t __init_memblock memblock_find_in_range_node(phys_addr_t start,
 					phys_addr_t end, phys_addr_t size,
 					phys_addr_t align, int nid)
@@ -112,17 +118,38 @@ phys_addr_t __init_memblock memblock_find_in_range_node(phys_addr_t start,
 	/* avoid allocating the first page */
 	/*!!C
 	 * max_t매크로는 서로다른 타입의 두 값을 type인자로 casting하여 비교할때 사용.
+	 * 둘중 큰값을 start/end 로 설정
 	 */
 	start = max_t(phys_addr_t, start, PAGE_SIZE);
 	end = max(start, end);
 
 	for_each_free_mem_range_reverse(i, nid, &this_start, &this_end, NULL) {
+		/*C!! 20150110 시작
+		 * 찾은 메모리 범위를 벗어난 경우 최대/최소 메모리 시작지점을 지정 하거나 범위 내에 있으면 해당 값 지정
+		 */
 		this_start = clamp(this_start, start, end);
 		this_end = clamp(this_end, start, end);
 
+		/*Q!!
+		 * this_end : 찾으려고 범위의 가장 큰값
+		 * size : 요청 한 값
+		 *
+		 * this_end 값은 region범위 상 최대 값인데, 
+		 * size값 보다 작은 경우는 요청 값을 찾을 수 없는 경우이다..
+		 * if 문이 true가 되면 더 작은 this_end값이 되는데.. break가 되야 하지 않을까????
+		 */
 		if (this_end < size)
 			continue;
 
+		/*C!!
+		 * round_down : align 단위로 내림
+		 * round_off : 반올림
+		 * round_up : 올림
+		 *
+		 * 원하는 사이즈가 있는지 확인
+		 * eg. end=4300 start=4100, size=128 
+		 * align하면 4096이 되버리면 요청한 128을 못 쓸 수 있게 됨 
+		 */
 		cand = round_down(this_end - size, align);
 		if (cand >= this_start)
 			return cand;
@@ -264,11 +291,18 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
 		addr = memblock_find_in_range(new_area_start + new_area_size,
 						memblock.current_limit,
 						new_alloc_size, PAGE_SIZE);
+		/*!!C
+		 * new_area_size = 0
+		 */
 		if (!addr && new_area_size)
 			addr = memblock_find_in_range(0,
 				min(new_area_start, memblock.current_limit),
 				new_alloc_size, PAGE_SIZE);
 
+		/*!!C
+		 * memblock  128 배열로설정 되어있음 - > double로 늘리기 위해 위에서 작업을 함
+		 * 그 공간을 사용하기 위해 new_array 로 사용
+		 */
 		new_array = addr ? __va(addr) : NULL;
 	}
 	if (!addr) {
@@ -286,26 +320,50 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
 	 * reserved region since it may be our reserved array itself that is
 	 * full.
 	 */
+
+	/*!!C
+	 * 사용할 공간에 복사를 하고 (new_size = 두배로 된거, old_size = 이전)
+	 * 0 으로 초기화 함
+	 */
 	memcpy(new_array, type->regions, old_size);
 	memset(new_array + type->max, 0, old_size);
+	/*!!C
+	 * swap old_array to new_array
+	 */
 	old_array = type->regions;
 	type->regions = new_array;
 	type->max <<= 1;
 
+	/*!!C
+	 * !!! use_slab이 아님!!!
+	 * 밑에 use_slab이 setting 된 후 kfree 사용됨
+	 * 초기 값은 0
+	 */
 	/* Free old array. We needn't free it if the array is the static one */
 	if (*in_slab)
 		kfree(old_array);
+	/*!!C
+	 * region을 더블로 만들 때 처음에는 가지고 있는 old_array가 memblock_memory_init_regions라서
+	 * 동적응로 free 할 수 없다.
+	 */
 	else if (old_array != memblock_memory_init_regions &&
 		 old_array != memblock_reserved_init_regions)
 		memblock_free(__pa(old_array), old_alloc_size);
-
+	
 	/*
 	 * Reserve the new array if that comes from the memblock.  Otherwise, we
 	 * needn't do it
 	 */
+	/*!!C
+	 * 찾은 new_array에 대해 reserved로추가함
+	 */
 	if (!use_slab)
 		BUG_ON(memblock_reserve(addr, new_alloc_size));
 
+	/*!!C 
+	 * 1단계: static 으로 설정된 array를 사용및 제거(현재 왜 reserved를 type으로 제거 하는지 모름)
+	 * 2단계: slab 할당자 사용 준비된 후 kmalloc/kfree를 사용
+	 */
 	/* Update slab flag */
 	*in_slab = use_slab;
 
@@ -391,6 +449,7 @@ static void __init_memblock memblock_insert_region(struct memblock_type *type,
  * 기존 region 과 겹치는 memory base 와 size 값으로 add 요청이
  * 올 수도 있다는 것을 명심할 것 !!
  */
+
 static int __init_memblock memblock_add_region(struct memblock_type *type,
 				phys_addr_t base, phys_addr_t size, int nid)
 {
@@ -542,21 +601,48 @@ static int __init_memblock memblock_isolate_range(struct memblock_type *type,
 	if (!size)
 		return 0;
 
+	/*!!C
+	 * isolate 할때 1개 region이 두개 이상 이 될 수 있기 때문
+	 */
 	/* we'll create at most two more regions */
 	while (type->cnt + 2 > type->max)
 		if (memblock_double_array(type, base, size) < 0)
 			return -ENOMEM;
 
+	/*!!C
+	 * 낮은 인덱스 부터 rbase/rend를 조건에 맞게 증가 시키며
+	 * else 구문에서 삭제할 값을 구하게 된다.
+	 */
 	for (i = 0; i < type->cnt; i++) {
 		struct memblock_region *rgn = &type->regions[i];
 		phys_addr_t rbase = rgn->base;
 		phys_addr_t rend = rbase + rgn->size;
+
+		/*!!C
+		 * rbase = reserve memory list의 i 번째 영역 시작
+		 * rend =  reserve memory list의 i 번째 영역 끝
+		 * base = isolate 할 시작 주소
+		 * end = isolate 할 끝 주소
+		 */
 
 		if (rbase >= end)
 			break;
 		if (rend <= base)
 			continue;
 
+			/*!!C
+			 * --------------
+			 * |		|		--------- end   
+			 * |		|		|	|
+			 * -------------| rend		|	|	
+			 * |		|		|-------| base
+			 * |		|
+			 * |		|
+			 * -------------- rbase
+			 * |		|
+			 * |		|
+			 * --------------
+			 */
 		if (rbase < base) {
 			/*
 			 * @rgn intersects from below.  Split and continue
@@ -567,6 +653,20 @@ static int __init_memblock memblock_isolate_range(struct memblock_type *type,
 			type->total_size -= base - rbase;
 			memblock_insert_region(type, i, rbase, base - rbase,
 					       memblock_get_region_node(rgn));
+			/*!!C
+			 * --------------
+			 * |		|   
+			 * |		|
+			 * -------------| rend	
+			 * |		|		
+			 * |		|		--------- end
+			 * |		|		|	|
+			 * -------------- rbas		|	|
+			 * |		|		|	|
+			 * |		|		--------- base
+			 * --------------
+			 */
+
 		} else if (rend > end) {
 			/*
 			 * @rgn intersects from above.  Split and redo the
@@ -576,7 +676,21 @@ static int __init_memblock memblock_isolate_range(struct memblock_type *type,
 			rgn->size -= end - rbase;
 			type->total_size -= end - rbase;
 			memblock_insert_region(type, i--, rbase, end - rbase,
-					       memblock_get_region_node(rgn));
+					memblock_get_region_node(rgn));
+
+			/*!!C 동일 하거나 포함
+			 * --------------
+			 * |		|   
+			 * |		|
+			 * -------------| rend		|--------| end
+			 * |		|		|	 |
+			 * |		|		|	 |
+			 * |		|		|	 |
+			 * -------------- rbas		|--------| base
+			 * |		|
+			 * |		|	
+			 * --------------
+			 */
 		} else {
 			/* @rgn is fully contained, record it */
 			if (!*end_rgn)
@@ -615,6 +729,10 @@ int __init_memblock memblock_free(phys_addr_t base, phys_addr_t size)
 		     (unsigned long long)base + size,
 		     (void *)_RET_IP_);
 
+	/*!!Q
+	 * reserved momory는 커널에서 사용 금지 한 영역인데..
+	 * 제거 하면 안될 것으로 현재 생각 됨..??
+	 */
 	return __memblock_remove(&memblock.reserved, base, size);
 }
 
