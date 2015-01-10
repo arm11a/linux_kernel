@@ -165,6 +165,7 @@ static const char *panic_later, *panic_param;
  * /include/asm-generic/vmlinux.lds.h 파일에__setup_start ~ __setup_end 까지
  * 영역이 나와 있다. But .h와 .S 중 어떤게 먼저인지 모르겠다.
  */
+
 extern const struct obs_kernel_param __setup_start[], __setup_end[];
 
 static int __init obsolete_checksetup(char *line)
@@ -316,7 +317,8 @@ static int __init init_setup(char *str)
 	return 1;
 }
 /*!!C init.c
-__setup("init=", init_setup);
+ *__setup("init=", init_setup);
+ */
 
 static int __init rdinit_setup(char *str)
 {
