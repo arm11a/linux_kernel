@@ -1248,6 +1248,11 @@ void __init arm_mm_memblock_reserve(void)
 	 * Reserve the page tables.  These are already in use,
 	 * and can only be in node 0.
 	 */
+	/*!!Q
+	 * 왜 node 0 (bottom address)일까???
+	 * 낮은 index에 노드에 낮은주소가 들어간다 그런데,
+	 * swapper_pg_dir가 현재 가장 낮은 주소이므로 index 0번에 들어 갈것이다.
+	 */
 	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_PG_DIR_SIZE);
 
 #ifdef CONFIG_SA1111

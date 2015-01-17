@@ -340,6 +340,9 @@ void __init arm_memblock_init(struct meminfo *mi,
 {
 	int i;
 
+	/*!!C
+	 * bank 갯수 만큼 memblock의 mermory영역에 추가
+	 */
 	for (i = 0; i < mi->nr_banks; i++)
 		memblock_add(mi->bank[i].start, mi->bank[i].size);
 
@@ -347,24 +350,40 @@ void __init arm_memblock_init(struct meminfo *mi,
 #ifdef CONFIG_XIP_KERNEL
 	memblock_reserve(__pa(_sdata), _end - _sdata);
 #else
+	/*!!C wjchoe
+	 * 커널에서 필요한 영역에 대한 reserved 함
+	 * section: vmlinux.lds.S에 정의된 stexrt ~ end까지 
+	 */
 	memblock_reserve(__pa(_stext), _end - _stext);
 #endif
 #ifdef CONFIG_BLK_DEV_INITRD
+	/*!!C
+	 * initrd 영역이 메모리 region에 존재 여부확인
+	 */
 	if (phys_initrd_size &&
 	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
 		pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
 		       (u64)phys_initrd_start, phys_initrd_size);
 		phys_initrd_start = phys_initrd_size = 0;
 	}
+	/*!!C
+	 * initrd 영역이 reserved 되어 있지않은지 여부
+	 */
 	if (phys_initrd_size &&
 	    memblock_is_region_reserved(phys_initrd_start, phys_initrd_size)) {
 		pr_err("INITRD: 0x%08llx+0x%08lx overlaps in-use memory region - disabling initrd\n",
 		       (u64)phys_initrd_start, phys_initrd_size);
 		phys_initrd_start = phys_initrd_size = 0;
 	}
+	/*!!C
+	 * 메모리 region에 존재하고 reserved 되어 있지 않으므로size만큼 reservd 영역을 확보 
+	 */
 	if (phys_initrd_size) {
 		memblock_reserve(phys_initrd_start, phys_initrd_size);
 
+		/*!!C wjchoe
+		 * initrd : block(eg.scsi) 장치 동작을 위해 필요한 드라이버를 사용하기 위한 임시 파일 시스템
+		 */
 		/* Now convert initrd to virtual addresses */
 		initrd_start = __phys_to_virt(phys_initrd_start);
 		initrd_end = initrd_start + phys_initrd_size;
@@ -375,12 +394,19 @@ void __init arm_memblock_init(struct meminfo *mi,
 	arm_dt_memblock_reserve();
 
 	/* reserve any platform specific memblock areas */
+	/*!!C
+	 * discrptor : arch/arm/mach-exynos/mach-exynos5-dt.c
+	 *
+	 */
 	if (mdesc->reserve)
 		mdesc->reserve();
 
 	/*
 	 * reserve memory for DMA contigouos allocations,
 	 * must come from DMA area inside low memory
+	 */
+	/*!!C
+	 * 20150117 까지
 	 */
 	dma_contiguous_reserve(min(arm_dma_limit, arm_lowmem_limit));
 

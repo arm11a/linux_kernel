@@ -52,8 +52,18 @@ void __init arm_dt_memblock_reserve(void)
 	 * and dtb locations which are already reserved, but overlaping
 	 * doesn't hurt anything
 	 */
+	/*!!C wjchoe
+	 * devcie tree : dtb start 부터 off_mem_rsvmap()까지 주소
+	 * !! 왜 사용하는가?
+	 * 특정 하드웨어에서 특정영역을 사용하기 위해 먼저 reserved함
+	 * eg. dts에 아래와 같이 사전 정의
+	 * /memreserve/ 0x20000000 0x00000100;
+	 */
 	reserve_map = ((void*)initial_boot_params) +
 			be32_to_cpu(initial_boot_params->off_mem_rsvmap);
+	/*!!C wjchoe
+	 * dtb파일에 reserved 하라고 정의된 내용 reserved함
+	 */
 	while (1) {
 		base = be64_to_cpup(reserve_map++);
 		size = be64_to_cpup(reserve_map++);

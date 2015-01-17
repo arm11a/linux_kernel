@@ -185,6 +185,14 @@ static void __init_memblock memblock_remove_region(struct memblock_type *type, u
 	type->cnt--;
 
 	/* Special case for empty arrays */
+	/*!!C wjchoe
+	 * 왜 type->cnt = 1을 하지??
+	 * memblock_region_add_region(): 
+	 * for (i = 0; i < type->cnt; i++) {
+	 * struct memblock_region *rgn = &type->regions[i];
+	 *
+	 * xxx : 최고 한 번 동작을 위해 type->cnt = 1
+	 */
 	if (type->cnt == 0) {
 		WARN_ON(type->total_size != 0);
 		type->cnt = 1;
@@ -343,6 +351,7 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
 	if (*in_slab)
 		kfree(old_array);
 	/*!!C
+	 * 이전에 할당된 old_array 삭제
 	 * region을 더블로 만들 때 처음에는 가지고 있는 old_array가 memblock_memory_init_regions라서
 	 * 동적응로 free 할 수 없다.
 	 */
@@ -385,6 +394,9 @@ static void __init_memblock memblock_merge_regions(struct memblock_type *type)
 		struct memblock_region *this = &type->regions[i];
 		struct memblock_region *next = &type->regions[i + 1];
 
+		/*!!C wjchoe
+		 * 이웃한 region을 찾음
+		 */
 		if (this->base + this->size != next->base ||
 		    memblock_get_region_node(this) !=
 		    memblock_get_region_node(next)) {
@@ -395,6 +407,9 @@ static void __init_memblock memblock_merge_regions(struct memblock_type *type)
 
 		this->size += next->size;
 		/* move forward from next + 1, index of which is i + 2 */
+		/*!!C wjchoe
+		 * 2 - > 1개로 합쳐졌기 때문에 그빈 공간으로 다음인덱스 부터 끝까지 땡김
+		 */
 		memmove(next, next + 1, (type->cnt - (i + 2)) * sizeof(*next));
 		type->cnt--;
 	}
@@ -712,11 +727,18 @@ static int __init_memblock __memblock_remove(struct memblock_type *type,
 	if (ret)
 		return ret;
 
+	/*!!C wjchoe
+	 * 20150117 시작
+	 * ck_merge_regions 
+	 * 찾아낸 region 삭제
+	 */
 	for (i = end_rgn - 1; i >= start_rgn; i--)
 		memblock_remove_region(type, i);
 	return 0;
 }
-
+/*!!C wjchoe
+ * memory region에서 사용할 수 있는 공간 삭제 - 사용 불가 및 reserved 불가
+ */
 int __init_memblock memblock_remove(phys_addr_t base, phys_addr_t size)
 {
 	return __memblock_remove(&memblock.memory, base, size);
@@ -729,9 +751,8 @@ int __init_memblock memblock_free(phys_addr_t base, phys_addr_t size)
 		     (unsigned long long)base + size,
 		     (void *)_RET_IP_);
 
-	/*!!Q
-	 * reserved momory는 커널에서 사용 금지 한 영역인데..
-	 * 제거 하면 안될 것으로 현재 생각 됨..??
+	/*!!C
+	 * 이전 할당된 영역 삭제- reserved 영역
 	 */
 	return __memblock_remove(&memblock.reserved, base, size);
 }
@@ -744,7 +765,10 @@ int __init_memblock memblock_reserve(phys_addr_t base, phys_addr_t size)
 		     (unsigned long long)base,
 		     (unsigned long long)base + size,
 		     (void *)_RET_IP_);
-
+	/*!!C
+	 * reserved region에 size만큼 추가
+	 * memblock_add_region에 대한 재귀적인 호출은 일어나지 않음
+	 */
 	return memblock_add_region(_rgn, base, size, MAX_NUMNODES);
 }
 
