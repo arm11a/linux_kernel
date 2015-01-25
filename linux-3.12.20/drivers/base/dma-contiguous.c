@@ -110,6 +110,12 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
 
 	pr_debug("%s(limit %08lx)\n", __func__, (unsigned long)limit);
 
+	/*!!Q
+	 * - size_cmdline이 최기화 되었는지 알 수 없음
+	 * - early_param("cma", early_cma)에서 early_cma가 등록 되었으나,
+	 * 호출 되는 부분이 어디에 있는지 찾을 수 없음
+	 * - CMA 플래그를 사용하지 않음
+	 */
 	if (size_cmdline != -1) {
 		selected_size = size_cmdline;
 	} else {
@@ -215,6 +221,12 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
 		return -EINVAL;
 
 	/* Sanitise input arguments */
+	/*!!C
+	 * max(MAX_ORDER - 1, pageblock_order) = 10
+	 * PAGE_SIZE = 4K
+	 * PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order) = 4096K
+	 * limit &= ~(alignment -1) = ??(limit이 어디서 초기화 되는지 확인 못함)
+	 */
 	alignment = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
 	base = ALIGN(base, alignment);
 	size = ALIGN(size, alignment);
