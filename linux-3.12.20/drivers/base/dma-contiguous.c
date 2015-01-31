@@ -115,10 +115,17 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
 	 * - early_param("cma", early_cma)에서 early_cma가 등록 되었으나,
 	 * 호출 되는 부분이 어디에 있는지 찾을 수 없음
 	 * - CMA 플래그를 사용하지 않음
+	 *   아래 URL에 가보면 Commnand Line에 대해서 정리해 놓은것이 있음!
+	 * https://e4deen.wordpress.com/2015/01/31/11차-arm-a-38주차-1월-31일-후기/
+	 * early_cma 가 실행이 안됐기때문에 size_cmdline = -1 로 유지된다.
 	 */
 	if (size_cmdline != -1) {
 		selected_size = size_cmdline;
 	} else {
+	/* 
+	 * 아래 부분의 feature 중에서 우리거에 설정된것이 아무것도 없기때문에
+	 * selected_size 는 0이고 contiguous_reserved_area 를 설정하지 않는다.
+	 */
 #ifdef CONFIG_CMA_SIZE_SEL_MBYTES
 		selected_size = size_bytes;
 #elif defined(CONFIG_CMA_SIZE_SEL_PERCENTAGE)

@@ -365,6 +365,9 @@ static void __init build_mem_type_table(void)
 			cachepolicy = CPOLICY_WRITEBACK;
 		ecc_mask = 0;
 	}
+	/* 이전에 봤던 개념들이긴 하지만 정확히 어떤의미를 갖는지는 코드를
+	 * 조금 더 보고 생각해보자
+	 */
 	if (is_smp())
 		cachepolicy = CPOLICY_WRITEALLOC;
 
@@ -402,6 +405,10 @@ static void __init build_mem_type_table(void)
 	/*
 	 * Mark the device areas according to the CPU/architecture.
 	 */
+	/*!!C
+	 * SCTLR, System Control Register, VMSA 의 레지스터를 위에서 cr로 읽어온것이고
+	 * 이 값은 CR_XP와AND 연산시 True이다.(ARM 문서에 1 로 reserved되어 있다.)
+	 */
 	if (cpu_is_xsc3() || (cpu_arch >= CPU_ARCH_ARMv6 && (cr & CR_XP))) {
 		if (!cpu_is_xsc3()) {
 			/*
@@ -413,14 +420,26 @@ static void __init build_mem_type_table(void)
 			mem_types[MT_DEVICE_CACHED].prot_sect |= PMD_SECT_XN;
 			mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_XN;
 		}
-		if (cpu_arch >= CPU_ARCH_ARMv7 && (cr & CR_TRE)) {
-			/*
-			 * For ARMv7 with TEX remapping,
+	/*!!C ARM Document에 Reset value of the SCTLR 부분을 보면 SCTLR 레지스터의
+	 * Reset value(초기값)이 나와 있다. 여기서 봤을때 TRE =0, 23번 bit =1 로
+	 * 나와 있는것을 확인 할 수 있다.
+	 */
+	if (cpu_arch >= CPU_ARCH_ARMv7 && (cr & CR_TRE)) {
+	/*!!C XN(execute-never)란?
+	   each memory region에 실행가능한 코드가 없다고 태깅을 해놓고
+	   region에 있는 instruction을 실행하려 할 경우 permission fault를
+	   발생시킨다.
+	   xn 비트는 mmu가 세팅되어 있는 경우에만 유효하고
+	   mmu가 없는 경우 모든 page가 실행가능하다
+	*/
+	        	/* For ARMv7 with TEX remapping,
 			 * - shared device is SXCB=1100
 			 * - nonshared device is SXCB=0100
 			 * - write combine device mem is SXCB=0001
 			 * (Uncached Normal memory)
 			 */
+			/*!!C http://www.iamroot.org/xe/Kernel_10_ARM/185577 링크참조
+			 * http://www.iamroot.org/xe/index.php?_filter=search&mid=Kernel_10_ARM&search_keyword=28%EC%A3%BC%EC%B0%A8&search_target=title&document_srl=185905 */
 			mem_types[MT_DEVICE].prot_sect |= PMD_SECT_TEX(1);
 			mem_types[MT_DEVICE_NONSHARED].prot_sect |= PMD_SECT_TEX(1);
 			mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_BUFFERABLE;

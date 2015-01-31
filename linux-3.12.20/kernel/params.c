@@ -196,6 +196,7 @@ int parse_args(const char *doing,
 	char *param, *val;
 
 	/* Chew leading spaces */
+	/*!!C args 에 있는 string에서 string 을 모두 삭제하고 이어붙임. */
 	args = skip_spaces(args);
 	/*!!C bootargs = "console=ttySAC2,115200 init=/linuxrc"; */
 	if (*args)

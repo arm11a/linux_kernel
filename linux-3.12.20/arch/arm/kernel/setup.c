@@ -1222,7 +1222,7 @@ void __init setup_arch(char **cmdline_p)
 	sanity_check_meminfo();
 
 	arm_memblock_init(&meminfo, mdesc);
-
+    /* 2015-01-31 에 드디어 paging_init() 진입!!! */
 	paging_init(mdesc);
 	request_standard_resources(mdesc);
 
