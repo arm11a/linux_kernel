@@ -26,10 +26,11 @@ if [ -e /usr/local/bin/gtags ]; then
     make gtags
 fi
 
-if [ -e /usr/bin/ctags ]; then
-    make tags
-fi 
-
-if [ -e /usr/bin/cscope ]; then
-    make cscope
-fi
+#if [ -e /usr/bin/ctags ]; then
+#    make tags
+#fi 
+#
+#if [ -e /usr/bin/cscope ]; then
+#    make cscope
+#fi
+#

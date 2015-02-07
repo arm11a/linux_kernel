@@ -18,6 +18,13 @@
   나중에 struct task_struct에서 자기 task가 가지고 있는 메모리를
   이 메모리 구조를 통해 가지고 있는다.
  */
+/* !!Q
+ * swapper_pg_dir 는 어디에서 설정되어 있는가...?
+ * mm_struct init_mm 에 swapper_pg_dir 은 arch/arm/kernel/head.S에 아래와 같이 정의 되어 있다.
+ * 	.globl	swapper_pg_dir
+ *	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - PG_DIR_SIZE
+ */
+/* 2015/02/07 study 는 여기에서 종료 */
 struct mm_struct init_mm = {
 	.mm_rb		= RB_ROOT,
 	.pgd		= swapper_pg_dir,

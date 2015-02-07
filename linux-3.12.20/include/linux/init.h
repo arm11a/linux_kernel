@@ -263,6 +263,7 @@ struct obs_kernel_param {
  *                  __setup_str_init_setup, init_setup, 0 
  *                  }
 */
+
 /*
 early_param("cma", early_cma);
 #define early_param(str, fn)					\
@@ -274,6 +275,7 @@ __setup_early_cma 라는  obs_kernel_param 구조체 변수 생성하고 아래 
                    early_cma() 라는  펑션포인터
                    early 는 1
 */
+
 #define __setup_param(str, unique_id, fn, early)			\
 	static const char __setup_str_##unique_id[] __initconst	\
 		__aligned(1) = str; \

@@ -179,7 +179,12 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 
 #define pgd_offset(mm, addr)	((mm)->pgd + pgd_index(addr))
 
+
 /* to find an entry in a kernel page-table-directory */
+
+/* !!C
+ * &init_mm 은 mm/init_mm.c 의 struct mm_struct
+ */
 #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
 
 #define pmd_none(pmd)		(!pmd_val(pmd))

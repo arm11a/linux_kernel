@@ -79,6 +79,10 @@ struct cachepolicy {
 #define s2_policy(policy)	0
 #endif
 
+/* !!C 
+ * L_PTE --> Linux" PTE definitions. 
+ */
+
 static struct cachepolicy cache_policies[] __initdata = {
 	{
 		.policy		= "uncached",
@@ -232,6 +236,10 @@ __setup("noalign", noalign_setup);
 #define PROT_PTE_S2_DEVICE	PROT_PTE_DEVICE
 #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
 
+/* !C : 
+ * 모기향 책 199 page 참조.
+ * 메모리의 타입 테이블의 초기값 설정.
+ */
 static struct mem_type mem_types[] = {
 	[MT_DEVICE] = {		  /* Strongly ordered / ARMv6 shared device */
 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_SHARED |
@@ -425,21 +433,27 @@ static void __init build_mem_type_table(void)
 	 * 나와 있는것을 확인 할 수 있다.
 	 */
 	if (cpu_arch >= CPU_ARCH_ARMv7 && (cr & CR_TRE)) {
-	/*!!C XN(execute-never)란?
-	   each memory region에 실행가능한 코드가 없다고 태깅을 해놓고
-	   region에 있는 instruction을 실행하려 할 경우 permission fault를
-	   발생시킨다.
-	   xn 비트는 mmu가 세팅되어 있는 경우에만 유효하고
-	   mmu가 없는 경우 모든 page가 실행가능하다
-	*/
-	        	/* For ARMv7 with TEX remapping,
-			 * - shared device is SXCB=1100
-			 * - nonshared device is SXCB=0100
-			 * - write combine device mem is SXCB=0001
-			 * (Uncached Normal memory)
-			 */
-			/*!!C http://www.iamroot.org/xe/Kernel_10_ARM/185577 링크참조
-			 * http://www.iamroot.org/xe/index.php?_filter=search&mid=Kernel_10_ARM&search_keyword=28%EC%A3%BC%EC%B0%A8&search_target=title&document_srl=185905 */
+		/*!!C XN(execute-never)란?
+		  each memory region에 실행가능한 코드가 없다고 태깅을 해놓고
+		  region에 있는 instruction을 실행하려 할 경우 permission fault를
+		  발생시킨다.
+		  xn 비트는 mmu가 세팅되어 있는 경우에만 유효하고
+		  mmu가 없는 경우 모든 page가 실행가능하다
+		*/
+		/* For ARMv7 with TEX remapping,
+		 * - shared device is SXCB=1100
+		 * - nonshared device is SXCB=0100
+		 * - write combine device mem is SXCB=0001
+		 * (Uncached Normal memory)
+		 */
+		/*!!C http://www.iamroot.org/xe/Kernel_10_ARM/185577 링크참조
+		 * http://www.iamroot.org/xe/index.php?_filter=search&mid=Kernel_10_ARM&search_keyword=28%EC%A3%BC%EC%B0%A8&search_target=title&document_srl=185905 */
+		
+		/* !!C cpu architecture core 에 
+		 * 물리적으로 접근 할 수 있는 영역을 지정 (memory map).
+		 * mem_type 구조체는 MT_DEVICE 타입의 메모리는 특정 아키텍쳐에서는 해당 기능의 추가 기능을 설정 할 수 있다. 
+		 * ex) mem_types[MT_DEVICE].prot_sect |= PMD_SECT_TEX(1) MT_DEVICE 의 PMD_SECT_TEX 을 켤 수 있다.
+		 */
 			mem_types[MT_DEVICE].prot_sect |= PMD_SECT_TEX(1);
 			mem_types[MT_DEVICE_NONSHARED].prot_sect |= PMD_SECT_TEX(1);
 			mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_BUFFERABLE;
@@ -476,6 +490,11 @@ static void __init build_mem_type_table(void)
 	/*
 	 * Now deal with the memory-type mappings
 	 */
+	/* !!C 
+	 * if (is_smp()) 에서 
+	 * cachepolicy = CPOLICY_WRITEALLOC; 설정.
+	 */
+
 	cp = &cache_policies[cachepolicy];
 	vecs_pgprot = kern_pgprot = user_pgprot = cp->pte;
 	s2_pgprot = cp->pte_s2;
@@ -511,6 +530,9 @@ static void __init build_mem_type_table(void)
 			 * Mark memory with the "shared" attribute
 			 * for SMP systems
 			 */
+			/* !!C 
+			 * ex) user_pgprot 의 prot 관련 protect 로 추측
+			 */
 			user_pgprot |= L_PTE_SHARED;
 			kern_pgprot |= L_PTE_SHARED;
 			vecs_pgprot |= L_PTE_SHARED;
@@ -530,6 +552,9 @@ static void __init build_mem_type_table(void)
 	/*
 	 * Non-cacheable Normal - intended for memory areas that must
 	 * not cause dirty cache line writebacks when used
+	 */
+	/* !!C
+	 * writeback을 하기 위한 하드웨어 dependency 한 값을 셋팅 한다.
 	 */
 	if (cpu_arch >= CPU_ARCH_ARMv6) {
 		if (cpu_arch >= CPU_ARCH_ARMv7 && (cr & CR_TRE)) {
@@ -558,10 +583,17 @@ static void __init build_mem_type_table(void)
 	vecs_pgprot |= PTE_EXT_AF;
 #endif
 
+	/* !!C 
+	 * protection_map 의 테이블에 user_pgprot 을 다시 넣어 반영함.
+	 */
 	for (i = 0; i < 16; i++) {
 		pteval_t v = pgprot_val(protection_map[i]);
 		protection_map[i] = __pgprot(v | user_pgprot);
 	}
+
+	/* !!C	 
+	 * cache policy 에서 가져온 값을 다시 지정한다.
+	 */
 
 	mem_types[MT_LOW_VECTORS].prot_pte |= vecs_pgprot;
 	mem_types[MT_HIGH_VECTORS].prot_pte |= vecs_pgprot;
@@ -573,6 +605,9 @@ static void __init build_mem_type_table(void)
 	pgprot_s2_device  = __pgprot(s2_device_pgprot);
 	pgprot_hyp_device  = __pgprot(hyp_device_pgprot);
 
+	/* !!C 
+	 * ecc_mask 의 값을 early_param() 에서 가져온다.
+	 */
 	mem_types[MT_LOW_VECTORS].prot_l1 |= ecc_mask;
 	mem_types[MT_HIGH_VECTORS].prot_l1 |= ecc_mask;
 	mem_types[MT_MEMORY].prot_sect |= ecc_mask | cp->pmd;
@@ -592,7 +627,10 @@ static void __init build_mem_type_table(void)
 	}
 	printk("Memory policy: ECC %sabled, Data cache %s\n",
 		ecc_mask ? "en" : "dis", cp->policy);
-
+	/* !!C
+	 * memtype 의 도메인 값을 t->prot_l1 에 설정.
+	 * Architecture 에 맞게 prot_l1 과 prot_sect 값을 설정하여 준다.
+	 */
 	for (i = 0; i < ARRAY_SIZE(mem_types); i++) {
 		struct mem_type *t = &mem_types[i];
 		if (t->prot_l1)
@@ -1224,6 +1262,12 @@ static inline void prepare_page_table(void)
 	/*
 	 * Clear out all the mappings below the kernel image.
 	 */
+
+	/* !!C 
+	 * pmd : page middle directory
+	 * kernel image page table 에 맵핑 되어 있는 (PAGE_OFFSET - SZ_16M) PMD_SIZE 만큼 clear 해준다.
+	 */
+
 	for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)
 		pmd_clear(pmd_off_k(addr));
 
@@ -1231,6 +1275,11 @@ static inline void prepare_page_table(void)
 	/* The XIP kernel is mapped in the module area -- skip over it */
 	addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
 #endif
+	/* !!C
+	 * PAGE_OFFSET : 0xC0000000
+	 * PMD_SIZE : 2M
+	 */
+
 	for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
 		pmd_clear(pmd_off_k(addr));
 
@@ -1427,6 +1476,7 @@ void __init paging_init(const struct machine_desc *mdesc)
 {
 	void *zero_page;
 
+	/* 2015/02/07 스터디 시작 */
 	build_mem_type_table();
 	prepare_page_table();
 	map_lowmem();
