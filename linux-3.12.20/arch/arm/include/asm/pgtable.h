@@ -175,6 +175,12 @@ extern struct page *empty_zero_page;
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 
 /* to find an entry in a page-table-directory */
+
+/*!!Q
+ * 2Mega unit shifting  
+ * 두개의 element를 사용하는데 각각의 하나는 1mega를 의미함
+ */
+
 #define pgd_index(addr)		((addr) >> PGDIR_SHIFT)
 
 #define pgd_offset(mm, addr)	((mm)->pgd + pgd_index(addr))

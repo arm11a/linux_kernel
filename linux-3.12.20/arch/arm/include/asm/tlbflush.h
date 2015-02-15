@@ -615,7 +615,7 @@ static inline void flush_pmd_entry(void *pmd)
 		dsb(ishst);
 }
 
-/* !!C
+/*!!C
 tlb_op(TLB_DCLEAN, “c7, c10, 1 @ flush_pmd”, pmd)
 do { \
   if (((-1UL) & \
@@ -681,7 +681,9 @@ tlb_l2_op(TLB_L2CLEAN_FR, “c15, c9, 1  @ L2 flush_pmd”, pmd
                   : "cc"); \
           } while (0)
 */
-
+/*!!C
+ * data cache clean operation...
+*/
 static inline void clean_pmd_entry(void *pmd)
 {
 	const unsigned int __tlb_flag = __cpu_tlb_flags;

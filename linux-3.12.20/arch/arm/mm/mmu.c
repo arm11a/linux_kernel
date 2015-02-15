@@ -1069,7 +1069,10 @@ void __init sanity_check_meminfo(void)
 {
 	phys_addr_t memblock_limit = 0;
 	int i, j, highmem = 0;
-	/*!!C vmalloc_min = 0xEF800000
+
+	/*!!C 
+	 * x86 standard!!! 
+	 * vmalloc_min = 0xEF800000
 	 * 3G~ 3.896G 까지는 LowMem
 	 * 3.896~ 4G 까지는 HighMem 
 	 * vmalloc_limit 은 HighMem 의 가장 아랫부분(3.896G)의 물리주소를  의미한다.
@@ -1271,6 +1274,14 @@ static inline void prepare_page_table(void)
 	for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)
 		pmd_clear(pmd_off_k(addr));
 
+	/* !!C 
+	 * if def CONFIG_XIP_KERNEL then 
+	 * 시작 어드레스를 바꿔줘야 한다.
+	 * 왜냐하면 MODULES_VADDR과 
+	 * ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK 사이는
+	 * XIP kernel이 이 module area를 사용하기 때문이다.
+	 */
+
 #ifdef CONFIG_XIP_KERNEL
 	/* The XIP kernel is mapped in the module area -- skip over it */
 	addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
@@ -1278,6 +1289,7 @@ static inline void prepare_page_table(void)
 	/* !!C
 	 * PAGE_OFFSET : 0xC0000000
 	 * PMD_SIZE : 2M
+	 * PAGE_OFFSET : 3Giga
 	 */
 
 	for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
