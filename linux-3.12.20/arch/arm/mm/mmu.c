@@ -1198,6 +1198,8 @@ void __init sanity_check_meminfo(void)
 #ifdef CONFIG_HIGHMEM
     /*!!C 
      * highmem 에 속하는 memory bank 가 존재한다면 
+     * 우리는 exynox5420 으로 진행중이고, cortex-A15 이기때문에 PIPT이다.
+     * http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0438h/CHDGEDAE.html
      */
 	if (highmem) {
 		const char *reason = NULL;
@@ -1295,8 +1297,12 @@ static inline void prepare_page_table(void)
 	for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
 		pmd_clear(pmd_off_k(addr));
 
+	/* !!C 2015-02-28 시작 */
 	/*
 	 * Find the end of the first block of lowmem.
+	 */
+	/* !!c low mem 은 가상주소 - xx 같이 간단하게 가상주소와 물리주소의
+	 * 변환이 가능하고, highmem은 redirection 을 한번 해야한다.
 	 */
 	end = memblock.memory.regions[0].base + memblock.memory.regions[0].size;
 	if (end >= arm_lowmem_limit)

@@ -511,7 +511,8 @@ repeat:
          */
 		phys_addr_t rbase = rgn->base;
 		phys_addr_t rend = rbase + rgn->size;
-
+	/*!!C rbase/rend 는 bank[0] 에 대한것
+	 * end/base 는 bank[1] 에 대한것 !! */
 		if (rbase >= end)
 			break;
 		if (rend <= base)
