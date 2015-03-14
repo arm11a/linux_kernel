@@ -772,6 +772,9 @@ static void __init create_36bit_mapping(struct map_desc *md,
 	phys = __pfn_to_phys(md->pfn);
 	length = PAGE_ALIGN(md->length);
 
+	/*!!C
+	 * arm v6, xsc3 이상만 36bit address 되는가보다.
+	 */
 	if (!(cpu_architecture() >= CPU_ARCH_ARMv6 || cpu_is_xsc3())) {
 		printk(KERN_ERR "MM: CPU does not support supersection "
 		       "mapping for 0x%08llx at 0x%08lx\n",
@@ -792,6 +795,9 @@ static void __init create_36bit_mapping(struct map_desc *md,
 		return;
 	}
 
+	/*!!C
+	 * addr, length ,__pfn_to_phys(md->pfn) 이 16MB단위로 얼라인 되어 있어야한다.
+	 */
 	if ((addr | length | __pfn_to_phys(md->pfn)) & ~SUPERSECTION_MASK) {
 		printk(KERN_ERR "MM: cannot create mapping for 0x%08llx"
 		       " at 0x%08lx invalid alignment\n",
@@ -812,6 +818,9 @@ static void __init create_36bit_mapping(struct map_desc *md,
 		pmd_t *pmd = pmd_offset(pud, addr);
 		int i;
 
+		/*!!Q
+		 * 왜 16개의 table을 같은 값으로 했나?
+		 */
 		for (i = 0; i < 16; i++)
 			*pmd++ = __pmd(phys | type->prot_sect | PMD_SECT_SUPER);
 
@@ -838,6 +847,7 @@ static void __init create_mapping(struct map_desc *md)
 
     /*!!C
     * vectors_base : 우리 시스템에서는 0xffff0000 
+    * Task size 는 유저 스페이스의 끝
     */
 	if (md->virtual != vectors_base() && md->virtual < TASK_SIZE) {
 		printk(KERN_WARNING "BUG: not creating mapping for 0x%08llx"
@@ -859,6 +869,7 @@ static void __init create_mapping(struct map_desc *md)
 #ifndef CONFIG_ARM_LPAE
 	/*
 	 * Catch 36-bit addresses
+	 *    0x1 00000  XXX <- 이상황 4gb(32bit) 가 넘는다.
 	 */
 	if (md->pfn >= 0x100000) {
 		create_36bit_mapping(md, type);
@@ -866,10 +877,27 @@ static void __init create_mapping(struct map_desc *md)
 	}
 #endif
 
+	/*!C
+	 * PAGE_MASK    =  0xFFFFF000
+	 */
 	addr = md->virtual & PAGE_MASK;
 	phys = __pfn_to_phys(md->pfn);
+
+	/*!C
+	 * ex> virtual 	= 0xc000 0FFE
+	 * addr 		= 0xc000 0000
+	 * md->lenght 	= 2
+	 *
+	 * 이상황에서 실제 메모리 리즌은 2개의 페이지 프레임에 걸처있으나
+	 * length 를 바로 md->length 로 사용하면 1개의 프레임의 길이가 되어 얼라인에 의한 문제가 생긴다.
+	 * 그래서 아래와 같이 virtual address 의 뒤 12bit의 값과 length 를 더하여 length 를 구한다.
+	 */
+
 	length = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
 
+	/*!C
+	 * addr, phys, length 가 Mega단위로 얼라인이 되어 있어야한다. (l1 케쉬가 아닐때)
+	 */
 	if (type->prot_l1 == 0 && ((addr | phys | length) & ~SECTION_MASK)) {
 		printk(KERN_WARNING "BUG: map for 0x%08llx at 0x%08lx can not "
 		       "be mapped using pages, ignoring.\n",
@@ -1486,7 +1514,8 @@ static void __init map_lowmem(void)
 			break;
 
     	/*!!C
-     	* pfn : 4k 단위의 page flame number 
+     	* pfn : 4k 단위의 page frame number
+     	* ((unsigned long)((start) >> 12))
      	*/
 		map.pfn = __phys_to_pfn(start);
 		map.virtual = __phys_to_virt(start);
@@ -1506,9 +1535,9 @@ void __init paging_init(const struct machine_desc *mdesc)
 	void *zero_page;
 
 	/* 2015/02/07 스터디 시작 */
-	build_mem_type_table();
-	prepare_page_table();
-	map_lowmem();
+	build_mem_type_table(); //!!C mem_type table 을 지금 arch 에 맞게 수정한다
+	prepare_page_table();	//!!C Page Table을 초기화 해준다
+	map_lowmem();			//!!C lowmem 영역의 pagetable(swapper_pg_dir) 생성
 	dma_contiguous_remap();
 	devicemaps_init(mdesc);
 	kmap_init();
