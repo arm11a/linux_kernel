@@ -836,6 +836,9 @@ static void __init create_mapping(struct map_desc *md)
 	const struct mem_type *type;
 	pgd_t *pgd;
 
+    /*!!C
+    * vectors_base : 우리 시스템에서는 0xffff0000 
+    */
 	if (md->virtual != vectors_base() && md->virtual < TASK_SIZE) {
 		printk(KERN_WARNING "BUG: not creating mapping for 0x%08llx"
 		       " at 0x%08lx in user region\n",
@@ -1466,6 +1469,11 @@ static void __init map_lowmem(void)
 {
 	struct memblock_region *reg;
 
+    /*!!C
+	 *  2015.03.07
+     *  reserved가 아닌 memory block의 처음부터 끝까지 looping 
+     */
+
 	/* Map all the lowmem memory banks. */
 	for_each_memblock(memory, reg) {
 		phys_addr_t start = reg->base;
@@ -1477,6 +1485,9 @@ static void __init map_lowmem(void)
 		if (start >= end)
 			break;
 
+    	/*!!C
+     	* pfn : 4k 단위의 page flame number 
+     	*/
 		map.pfn = __phys_to_pfn(start);
 		map.virtual = __phys_to_virt(start);
 		map.length = end - start;

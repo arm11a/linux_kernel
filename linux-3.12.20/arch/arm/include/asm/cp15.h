@@ -41,6 +41,14 @@
 
 #ifndef __ASSEMBLY__
 
+/*!!C
+* cr_alignment 세팅 : arch/arm/kernel/head-common.s 
+* 173, 188 line 참조 
+* cr_alignment에는 cp15 control register 값이 들어가 있음
+* 상위에 1이 여러개 세팅되어 있음
+*  
+*/
+
 #if __LINUX_ARM_ARCH__ >= 4
 #define vectors_high()	(cr_alignment & CR_V)
 #else
