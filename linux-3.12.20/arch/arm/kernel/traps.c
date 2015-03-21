@@ -878,6 +878,7 @@ void __init early_trap_init(void *vectors_base)
 	 * ISAs.  The Thumb version is an undefined instruction with a
 	 * branch back to the undefined instruction.
 	 */
+	/*!!C table을 초기화하기 전에 undefined instruction으로 채워넣음 */
 	for (i = 0; i < PAGE_SIZE / sizeof(u32); i++)
 		((u32 *)vectors_base)[i] = 0xe7fddef1;
 
@@ -886,7 +887,9 @@ void __init early_trap_init(void *vectors_base)
 	 * into the vector page, mapped at 0xffff0000, and ensure these
 	 * are visible to the instruction stream.
 	 */
+	/*!!C FIQ handler의 주소를 가지고 있는 배열을 복사 by 찬의형님 */ 
 	memcpy((void *)vectors, __vectors_start, __vectors_end - __vectors_start);
+	/*!!C SW interrupt function을 복사 */
 	memcpy((void *)vectors + 0x1000, __stubs_start, __stubs_end - __stubs_start);
 
 	kuser_init(vectors_base);

@@ -941,6 +941,8 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
 		vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
 		vm->flags |= VM_ARM_MTYPE(md->type);
 		vm->caller = iotable_init;
+		/*!!C 전역 리스트에 노드를 추가하는 함수 */
+		/*!!C 커널에서 사용하는 링크드리스트 관련 함수들 유용함 */
 		add_static_vm_early(svm++);
 	}
 }

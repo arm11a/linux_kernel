@@ -409,6 +409,8 @@ void __init dma_contiguous_early_fixup(phys_addr_t base, unsigned long size)
 	dma_mmu_remap_num++;
 }
 
+/*!!C 기존에 map_lowmem()에서 page table로 매핑을 했던 LOWMEM영역 중 dma영역의
+ *    부분을 다른 속성을 지정하여 다시 매핑을 하는 함수 */
 void __init dma_contiguous_remap(void)
 {
 	int i;
