@@ -928,7 +928,7 @@ kuser_cmpxchg32_fixup:
 	kuser_pad __kuser_cmpxchg, 32
 
 __kuser_get_tls:				@ 0xffff0fe0
-	ldr	r0, [pc, #(16 - 8)]	@ read TLS, set in kuser_get_tls_init
+	mrc	p15, 0, r0, c13, c0, 3	@ 0xffff0fe8 hardware TLS code
 	usr_ret	lr
 	mrc	p15, 0, r0, c13, c0, 3	@ 0xffff0fe8 hardware TLS code
 	kuser_pad __kuser_get_tls, 16

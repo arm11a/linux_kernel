@@ -1401,7 +1401,7 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	 */
 	vectors = early_alloc(PAGE_SIZE * 2);
 
-	early_trap_init(vectors);
+	early_trap_init(vectors);  ///!C tap 을 위한 vactor table 생성
 
 	for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
 		pmd_clear(pmd_off_k(addr));
@@ -1441,6 +1441,10 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	 * location (0xffff0000).  If we aren't using high-vectors, also
 	 * create a mapping at the low-vectors virtual address.
 	 */
+	/*!!C
+	 *  vector 랑 stub 을 따로따로 맵핑을 할까?
+	 *  아마도 Kuser 사용여부에 따라 vector 영역의 type이 틀려서 그런듯하다.
+	 */
 	map.pfn = __phys_to_pfn(virt_to_phys(vectors));
 	map.virtual = 0xffff0000;
 	map.length = PAGE_SIZE;
@@ -1452,6 +1456,9 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	create_mapping(&map);
 
 	if (!vectors_high()) {
+		/*!!C
+		 * vector, stup 영역 한번에 맵핑
+		 */
 		map.virtual = 0;
 		map.length = PAGE_SIZE * 2;
 		map.type = MT_LOW_VECTORS;
@@ -1468,11 +1475,17 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	/*
 	 * Ask the machine support to map in the statically mapped devices.
 	 */
+	/*!!C
+	 * 아키텍처 에 정의된 IO레지스터 영역을 mmu 테이블에 맵핑
+	 */
 	if (mdesc->map_io)
 		mdesc->map_io();
 	else
 		debug_ll_io_init();
 	fill_pmd_gaps();
+	/*!!C
+	 * 4/4 여기까지함
+	 */
 
 	/* Reserve fixed i/o space in VMALLOC region */
 	pci_reserve_io();
