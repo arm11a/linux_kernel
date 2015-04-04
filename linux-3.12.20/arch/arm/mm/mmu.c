@@ -983,6 +983,10 @@ static void __init pmd_empty_section_gap(unsigned long addr)
 	vm_reserve_area_early(addr, SECTION_SIZE, pmd_empty_section_gap);
 }
 
+/*!!C
+ * PMD는 2mb 영역을 커버한다 그런데 가끔 1mb 로 하는 create_mapping() 같은 게 있다 그럼
+ * 문제가 생기는데 이 문제를 해결하기 위해 odd address 가 들어오면 dummy vm 을 추가한다.
+ */
 static void __init fill_pmd_gaps(void)
 {
 	struct static_vm *svm;
@@ -1001,6 +1005,9 @@ static void __init fill_pmd_gaps(void)
 		 * If so and the first section entry for this PMD is free
 		 * then we block the corresponding virtual address.
 		 */
+		/*!!C
+		 * 시작점 odd address 검출
+		 */
 		if ((addr & ~PMD_MASK) == SECTION_SIZE) {
 			pmd = pmd_off_k(addr);
 			if (pmd_none(*pmd))
@@ -1011,6 +1018,9 @@ static void __init fill_pmd_gaps(void)
 		 * Then check if this vm ends on an odd section boundary.
 		 * If so and the second section entry for this PMD is empty
 		 * then we block the corresponding virtual address.
+		 */
+		/*!!C
+		 * 끝점 odd address 검출
 		 */
 		addr += vm->size;
 		if ((addr & ~PMD_MASK) == SECTION_SIZE) {
