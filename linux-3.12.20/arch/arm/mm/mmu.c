@@ -893,8 +893,8 @@ static void __init create_mapping(struct map_desc *md)
 	 * 그래서 아래와 같이 virtual address 의 뒤 12bit의 값과 length 를 더하여 length 를 구한다.
 	 */
 
-	length = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
 
+	length = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
 	/*!C
 	 * addr, phys, length 가 Mega단위로 얼라인이 되어 있어야한다. (l1 케쉬가 아닐때)
 	 */
@@ -1430,6 +1430,9 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 
 	/*
 	 * Map the cache flushing regions.
+	 */
+	/*!!C 우리는 정의 안됨
+	 *
 	 */
 #ifdef FLUSH_BASE
 	map.pfn = __phys_to_pfn(FLUSH_BASE_PHYS);

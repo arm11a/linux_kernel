@@ -60,6 +60,10 @@ void __init s3c_init_cpu(unsigned long idcode,
 		panic("Unsupported Samsung CPU");
 	}
 
+	/*!!C
+	 * arm/mach-exynos/common.c 의 map_desc ... 로 정의
+	 * 목적 : cpu io  memory map 의 주소들을 virtual address 맵핑
+	 */
 	if (cpu->map_io)
 		cpu->map_io();
 }
