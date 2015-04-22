@@ -667,6 +667,9 @@ static void __init *early_alloc(unsigned long sz)
 	return early_alloc_aligned(sz, sz);
 }
 
+/*!!C
+ * 가상어드레스를 피지컬로 맵핑시켜서 패이지테이블까지 작성
+ */
 static pte_t * __init early_pte_alloc(pmd_t *pmd, unsigned long addr, unsigned long prot)
 {
 	if (pmd_none(*pmd)) {
@@ -1513,9 +1516,16 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	flush_cache_all();
 }
 
+/*!!C
+ * kmap 은 커널이 사용할수 있는 주소공간은 1GB(3~4G) 뿐이라 1GB이상 한번에 접근 할수 없다
+ * 그러므로 필요할때 그 이상의 주소를 kmap영역에 맵핑시켜서 서용될겄이다.
+ */
 static void __init kmap_init(void)
 {
 #ifdef CONFIG_HIGHMEM
+	/*!!C
+	 * KMAP 이 사용할 페이지 테이블의 공간을 할당받는다.
+	 */
 	pkmap_page_table = early_pte_alloc(pmd_off_k(PKMAP_BASE),
 		PKMAP_BASE, _PAGE_KERNEL_TABLE);
 #endif
