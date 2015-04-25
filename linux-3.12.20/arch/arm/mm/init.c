@@ -146,9 +146,16 @@ static void __init find_limits(unsigned long *min, unsigned long *max_low,
 
 	/* This assumes the meminfo array is properly sorted */
 	*min = bank_pfn_start(&mi->bank[0]);
+	/*!!C
+	 * higmeme 이 존재하는지 체크
+	 */
 	for_each_bank (i, mi)
 		if (mi->bank[i].highmem)
 				break;
+	/*!!C
+	 * max_low : lowmem 의 맥스 의 pfn(page frame number)
+	 * max_high : highmem 의 맥스 pfn
+	 */
 	*max_low = bank_pfn_end(&mi->bank[i - 1]);
 	*max_high = bank_pfn_end(&mi->bank[mi->nr_banks - 1]);
 }
@@ -169,6 +176,9 @@ static void __init arm_bootmem_init(unsigned long start_pfn,
 	bitmap = memblock_alloc_base(boot_pages << PAGE_SHIFT, L1_CACHE_BYTES,
 				__pfn_to_phys(end_pfn));
 
+	/*!!C
+	 *  4/25일 여기까지 함
+	 */
 	/*
 	 * Initialise the bootmem allocator, handing the
 	 * memory banks over to bootmem.
@@ -421,6 +431,9 @@ void __init bootmem_init(void)
 
 	max_low = max_high = 0;
 
+	/*!!C
+	 * lowmem 의 min max 찾는다.
+	 */
 	find_limits(&min, &max_low, &max_high);
 
 	arm_bootmem_init(min, max_low);

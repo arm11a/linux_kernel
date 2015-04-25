@@ -112,6 +112,9 @@ static int __init setup_tcm_bank(u8 type, u8 bank, u8 banks,
 	u32 tcm_region;
 	int tcm_size;
 
+	/*!!C
+	 * ARM 문서 	D12.7.5 에 레지스터 사용법이 나온다.
+	 */
 	/*
 	 * If there are more than one TCM bank of this type,
 	 * select the TCM bank to operate on in the TCM selection
@@ -130,6 +133,12 @@ static int __init setup_tcm_bank(u8 type, u8 bank, u8 banks,
 		asm("mrc	p15, 0, %0, c9, c1, 1"
 		    : "=r" (tcm_region));
 
+	/*!!C
+	 * Size, bits[6:2]
+		Indicates the size of the TCM. See Table D12-13 on page D12-2542 for encoding of this field.
+		This field is read-only and ignores writes.
+		En, bit[0]
+	 */
 	tcm_size = tcm_sizes[(tcm_region >> 2) & 0x0f];
 	if (tcm_size < 0) {
 		pr_err("CPU: %sTCM%d of unknown size\n",
@@ -153,6 +162,12 @@ static int __init setup_tcm_bank(u8 type, u8 bank, u8 banks,
 		return 0;
 
 	/* Force move the TCM bank to where we want it, enable */
+
+	/*!!C
+	 * TCM enable bit:
+		En == 0 Disabled. This is the reset value.
+		En == 1 Enabled.
+	 */
 	tcm_region = *offset | (tcm_region & 0x00000ffeU) | 1;
 
 	if (!type)
@@ -163,8 +178,11 @@ static int __init setup_tcm_bank(u8 type, u8 bank, u8 banks,
 		asm("mcr	p15, 0, %0, c9, c1, 1"
 		    : /* No output operands */
 		    : "r" (tcm_region));
-
+	/*!!C
+	 * Kbyte 단위로 size 를 키운다.s
+	 */
 	/* Increase offset */
+
 	*offset += (tcm_size << 10);
 
 	pr_info("CPU: moved %sTCM%d %dk to %08x, enabled\n",
@@ -207,6 +225,9 @@ void __init tcm_init(void)
 	dtcm_banks = (tcm_status >> 16) & 0x03;
 	itcm_banks = (tcm_status & 0x03);
 
+	/*!!Q
+	 * 왜 3,4 는 안되지?
+	 */
 	/* Values greater than 2 for D/ITCM banks are "reserved" */
 	if (dtcm_banks > 2)
 		dtcm_banks = 0;
@@ -232,6 +253,9 @@ void __init tcm_init(void)
 		dtcm_iomap[0].length = dtcm_end - DTCM_OFFSET;
 		iotable_init(dtcm_iomap, 1);
 		/* Copy data from RAM to DTCM */
+		/*!!C
+		 * RAM 에 있는 dtcm 섹션의 값을 방금활성화 시킨 TCM 메모리에 복사한다.
+		 */
 		start = &__sdtcm_data;
 		end   = &__edtcm_data;
 		ram   = &__dtcm_start;
@@ -245,6 +269,9 @@ void __init tcm_init(void)
 	}
 
 no_dtcm:
+	/*!!C
+	 * DTCM이랑 유사
+	 */
 	/* Setup ITCM if present */
 	if (itcm_banks > 0) {
 		for (i = 0; i < itcm_banks; i++) {

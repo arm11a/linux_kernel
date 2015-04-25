@@ -56,14 +56,25 @@ early_param("bootmem_debug", bootmem_debug_setup);
 
 static unsigned long __init bootmap_bytes(unsigned long pages)
 {
+	/*!!C
+	 * 한 바이트에 8bit이므로 round up
+	 */
 	unsigned long bytes = DIV_ROUND_UP(pages, 8);
 
+	/*!!Q
+	 *  bitmap 이 4byte unsigned long array 이므로 4byte align 이 필요. 확인 요망
+	 */
 	return ALIGN(bytes, sizeof(long));
 }
 
 /**
  * bootmem_bootmap_pages - calculate bitmap size in pages
  * @pages: number of pages the bitmap has to represent
+ */
+/*!!C
+ * bootmem 을 표현하는데 필요한 bitmap 의 페이지 개수
+ * ex> pages : 32 K , 1page 필요
+ *     pages : 33 K , 2page 필요
  */
 unsigned long __init bootmem_bootmap_pages(unsigned long pages)
 {
