@@ -153,13 +153,17 @@ static void __init find_limits(unsigned long *min, unsigned long *max_low,
 		if (mi->bank[i].highmem)
 				break;
 	/*!!C
-	 * max_low : lowmem 의 맥스 의 pfn(page frame number)
+	 * max_low : lowmem 의 가장 높은 address pfn(page frame number, arm_lowmem_limiit)
 	 * max_high : highmem 의 맥스 pfn
 	 */
 	*max_low = bank_pfn_end(&mi->bank[i - 1]);
 	*max_high = bank_pfn_end(&mi->bank[mi->nr_banks - 1]);
 }
 
+/*!!C
+ * start_pfn : low mem의 시작
+ * end_pfn : low mem 의 끝
+ */
 static void __init arm_bootmem_init(unsigned long start_pfn,
 	unsigned long end_pfn)
 {

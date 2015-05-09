@@ -73,7 +73,7 @@ static unsigned long __init bootmap_bytes(unsigned long pages)
  */
 /*!!C
  * bootmem 을 표현하는데 필요한 bitmap 의 페이지 개수
- * ex> pages : 32 K , 1page 필요
+ * ex> pages : 32 K , 1page 필요 ( 1 page 는 32 k page 를 관려할수있다.)
  *     pages : 33 K , 2page 필요
  */
 unsigned long __init bootmem_bootmap_pages(unsigned long pages)
