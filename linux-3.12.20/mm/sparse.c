@@ -75,6 +75,13 @@ static struct mem_section noinline __init_refok *sparse_index_alloc(int nid)
 	return section;
 }
 
+/*!!C
+ * @brief 341( SECTIONS_PER_ROOT ) 개 까지는 root 가 0 이며 342 가되면 root 가 1이된다.\n
+ *          첫번째 section이 공간(root)을 할당하고 341 까지는 return -EEXIST
+ * @param section_nr	: section index
+ * @param nid			: 안씀
+ * @return
+ */
 static int __meminit sparse_index_init(unsigned long section_nr, int nid)
 {
 	unsigned long root = SECTION_NR_TO_ROOT(section_nr);
@@ -171,6 +178,14 @@ void __init memory_present(int nid, unsigned long start, unsigned long end)
 
 	start &= PAGE_SECTION_MASK;
 	mminit_validate_memmodel_limits(&start, &end);
+	/*!!C
+	 * start = memblock memory start
+	 * end   = memblock memory end
+	 * PAGES_PER_SECTION = 16
+	 * section size = 2^16
+	 * total page = 2^20
+	 * num of section : 16
+	 */
 	for (pfn = start; pfn < end; pfn += PAGES_PER_SECTION) {
 		unsigned long section = pfn_to_section_nr(pfn);
 		struct mem_section *ms;
@@ -543,6 +558,9 @@ void __init sparse_init(void)
 	 *
 	 * powerpc need to call sparse_init_one_section right after each
 	 * sparse_early_mem_map_alloc, so allocate usemap_map at first.
+	 */
+	/*!!C
+	 * NR_MEM_SECTIONS = 16
 	 */
 	size = sizeof(unsigned long *) * NR_MEM_SECTIONS;
 	usemap_map = alloc_bootmem(size);

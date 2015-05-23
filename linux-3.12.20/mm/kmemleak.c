@@ -957,6 +957,10 @@ void __ref kmemleak_free_part(const void *ptr, size_t size)
 {
 	pr_debug("%s(0x%p)\n", __func__, ptr);
 
+	/*!!C
+	 * kmemleak_enabled 변수는 kmemleak_init() set 된다.
+	 * 5/16 일 delete_object_part 는 공부안함
+	 */
 	if (atomic_read(&kmemleak_enabled) && ptr && !IS_ERR(ptr))
 		delete_object_part((unsigned long)ptr, size);
 	else if (atomic_read(&kmemleak_early_log))
