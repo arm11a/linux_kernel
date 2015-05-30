@@ -498,7 +498,9 @@ static unsigned long __init align_off(struct bootmem_data *bdata,
 
 	return ALIGN(base + off, align) - base;
 }
-/*!!C 최초 부팅시에는 limit, goal 이 0으로 들어온다. */
+/*!!C 최초 부팅시에는 limit, goal 이 0으로 들어온다.
+ *  특정 뱅크에서만 얼로케이션
+ */
 static void * __init alloc_bootmem_bdata(struct bootmem_data *bdata,
 					unsigned long size, unsigned long align,
 					unsigned long goal, unsigned long limit)
@@ -605,7 +607,9 @@ find_block:
 
 	return NULL;
 }
-/*!!C align = 64, goal 0xffff ffff의 pa, limit =0 */
+/*!!C align = 64, goal 0xffff ffff의 pa, limit =0
+ * 어느 뱅크에서나 할당 시켜주는 함수
+ */
 static void * __init alloc_bootmem_core(unsigned long size,
 					unsigned long align,
 					unsigned long goal,
