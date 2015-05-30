@@ -68,7 +68,6 @@
 {							\
 	const typeof(y) __y = y;			\
 	(((x) + (__y - 1)) / __y) * __y;		\
-	// (256 + 7) /8 * 8
 }							\
 )
 #define rounddown(x, y) (				\
