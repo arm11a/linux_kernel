@@ -1068,7 +1068,7 @@ static inline unsigned long early_pfn_to_nid(unsigned long pfn)
 
 #define PAGES_PER_SECTION       (1UL << PFN_SECTION_SHIFT)
 #define PAGE_SECTION_MASK	(~(PAGES_PER_SECTION-1))
-
+//PFN_SECTION_SHIFT = 16, pageblock_order = 10, NR_PAGEBLOCK = 4
 #define SECTION_BLOCKFLAGS_BITS \
 	((1UL << (PFN_SECTION_SHIFT - pageblock_order)) * NR_PAGEBLOCK_BITS)
 

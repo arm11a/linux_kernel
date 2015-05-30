@@ -155,6 +155,8 @@ static void __init find_limits(unsigned long *min, unsigned long *max_low,
 	/*!!C
 	 * max_low : lowmem 의 가장 높은 address pfn(page frame number, arm_lowmem_limiit)
 	 * max_high : highmem 의 맥스 pfn
+	 * 우리는 bank 가 2개이다 arm_lowmem_init 에서 low/high를 
+	 * 갈라서 2개로 만들었다.
 	 */
 	*max_low = bank_pfn_end(&mi->bank[i - 1]);
 	*max_high = bank_pfn_end(&mi->bank[mi->nr_banks - 1]);
@@ -450,6 +452,10 @@ void __init bootmem_init(void)
 
 	/*
 	 * sparse_init() needs the bootmem allocator up and running.
+	 */
+	/*!!C 현재는 없지만 미리 공간을 잡아놓고 ON/OFF 형식으로
+	 * 사용하는 방식.  Working 중에 memory를 뺐다 꼽았다할 수 있다
+	 * http://www.iamroot.org/xe/QnA/13649#comment_27207
 	 */
 	sparse_init();
 

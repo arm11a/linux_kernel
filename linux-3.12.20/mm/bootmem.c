@@ -498,7 +498,7 @@ static unsigned long __init align_off(struct bootmem_data *bdata,
 
 	return ALIGN(base + off, align) - base;
 }
-
+/*!!C 최초 부팅시에는 limit, goal 이 0으로 들어온다. */
 static void * __init alloc_bootmem_bdata(struct bootmem_data *bdata,
 					unsigned long size, unsigned long align,
 					unsigned long goal, unsigned long limit)
@@ -605,7 +605,7 @@ find_block:
 
 	return NULL;
 }
-
+/*!!C align = 64, goal 0xffff ffff의 pa, limit =0 */
 static void * __init alloc_bootmem_core(unsigned long size,
 					unsigned long align,
 					unsigned long goal,
@@ -616,7 +616,8 @@ static void * __init alloc_bootmem_core(unsigned long size,
 
 	if (WARN_ON_ONCE(slab_is_available()))
 		return kzalloc(size, GFP_NOWAIT);
-
+/*!!C node_low_pfn = low mem의 끝(768MB?), 
+ * node_min_pfn = 메모리의 시작지점 */
 	list_for_each_entry(bdata, &bdata_list, list) {
 		if (goal && bdata->node_low_pfn <= PFN_DOWN(goal))
 			continue;
@@ -637,7 +638,9 @@ static void * __init ___alloc_bootmem_nopanic(unsigned long size,
 					      unsigned long limit)
 {
 	void *ptr;
-
+/*!!C 처음에는 goal 0xffff ffff의 pa 이지만 한번 return NULL을
+ * 맞고 나와서 goal 을 0 으로 셋팅해서 다시 alloc_bootmem_core진입
+ */
 restart:
 	ptr = alloc_bootmem_core(size, align, goal, limit);
 	if (ptr)

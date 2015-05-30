@@ -181,10 +181,8 @@ void __init memory_present(int nid, unsigned long start, unsigned long end)
 	/*!!C
 	 * start = memblock memory start
 	 * end   = memblock memory end
-	 * PAGES_PER_SECTION = 16
-	 * section size = 2^16
+	 * PAGES_PER_SECTION = 2^16
 	 * total page = 2^20
-	 * num of section : 16
 	 */
 	for (pfn = start; pfn < end; pfn += PAGES_PER_SECTION) {
 		unsigned long section = pfn_to_section_nr(pfn);
@@ -248,7 +246,8 @@ static int __meminit sparse_init_one_section(struct mem_section *ms,
 {
 	if (!present_section(ms))
 		return -EINVAL;
-
+	/*!!C 2015-05-23 여기까지. 
+	 * !!Q 왜 sparse_encode_mem_map 를 할까? encode/decode 를 왜 하는가?*/
 	ms->section_mem_map &= ~SECTION_MAP_MASK;
 	ms->section_mem_map |= sparse_encode_mem_map(mem_map, pnum) |
 							SECTION_HAS_MEM_MAP;
@@ -256,10 +255,11 @@ static int __meminit sparse_init_one_section(struct mem_section *ms,
 
 	return 1;
 }
-
+/*!!C SECTION_BLOCKFLAGS_BITS = 256 */
 unsigned long usemap_size(void)
 {
 	unsigned long size_bytes;
+	/*!!C 첫번째 계산의 결과도 32, 두번째 계산의 결과도 32 */
 	size_bytes = roundup(SECTION_BLOCKFLAGS_BITS, 8) / 8;
 	size_bytes = roundup(size_bytes, sizeof(unsigned long));
 	return size_bytes;
@@ -362,6 +362,7 @@ static void __init sparse_early_usemaps_alloc_node(void *data,
 	void *usemap;
 	unsigned long pnum;
 	unsigned long **usemap_map = (unsigned long **)data;
+	/*!!C 아래 계산결과는 32 */
 	int size = usemap_size();
 
 	usemap = sparse_early_usemaps_alloc_pgdat_section(NODE_DATA(nodeid),
@@ -509,8 +510,11 @@ static void __init alloc_usemap_and_memmap(void (*alloc_func)
 			continue;
 		ms = __nr_to_section(pnum);
 		nodeid = sparse_early_nid(ms);
+		/*!!C ARM 에서는 UMA이므로 1개의 BANK(NODE)만 있다.
+		 * 따라서 계속 map_count 만 increment 될 것이다. 
+		 * map_count 1당 256MByte가 된다.*/
 		if (nodeid == nodeid_begin) {
-			map_count++;
+			map_count++; 
 			continue;
 		}
 		/* ok, we need to take cake of from pnum_begin to pnum - 1*/
@@ -560,7 +564,7 @@ void __init sparse_init(void)
 	 * sparse_early_mem_map_alloc, so allocate usemap_map at first.
 	 */
 	/*!!C
-	 * NR_MEM_SECTIONS = 16
+	 * NR_MEM_SECTIONS = 16 섹션갯수를 의미한다.
 	 */
 	size = sizeof(unsigned long *) * NR_MEM_SECTIONS;
 	usemap_map = alloc_bootmem(size);
@@ -585,7 +589,7 @@ void __init sparse_init(void)
 		usemap = usemap_map[pnum];
 		if (!usemap)
 			continue;
-
+/* map은 각 page를 관리하기 위한 구조체배열을 할당한 주소 */
 #ifdef CONFIG_SPARSEMEM_ALLOC_MEM_MAP_TOGETHER
 		map = map_map[pnum];
 #else

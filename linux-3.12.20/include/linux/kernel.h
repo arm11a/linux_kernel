@@ -62,10 +62,13 @@
 #endif
 
 /* The `const' in roundup() prevents gcc-3.3 from calling __divdi3 */
+// x = 256, y = 8
+//
 #define roundup(x, y) (					\
 {							\
 	const typeof(y) __y = y;			\
 	(((x) + (__y - 1)) / __y) * __y;		\
+	// (256 + 7) /8 * 8
 }							\
 )
 #define rounddown(x, y) (				\
