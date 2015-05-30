@@ -539,7 +539,9 @@ static struct kmemleak_object *create_object(unsigned long ptr, size_t size,
 	object->jiffies = jiffies;
 	object->checksum = 0;
 
-	/* task information */
+	
+	But.... 추측에 의한 정리로는...
+		kmemleak_object 는 memory block allocation 시에 생성한 meta data이다./* task information */
 	if (in_irq()) {
 		object->pid = 0;
 		strncpy(object->comm, "hardirq", sizeof(object->comm));

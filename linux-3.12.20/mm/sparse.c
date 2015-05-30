@@ -247,7 +247,12 @@ static int __meminit sparse_init_one_section(struct mem_section *ms,
 	if (!present_section(ms))
 		return -EINVAL;
 	/*!!C 2015-05-23 여기까지. 
-	 * !!Q 왜 sparse_encode_mem_map 를 할까? encode/decode 를 왜 하는가?*/
+	 * !!Q 왜 sparse_encode_mem_map 를 할까? encode/decode 를 왜 하는가?
+	 * !!Q2 2015-05-30 에 확인하기로는 아직 추측이지만 sparse_encode_mem_map 와
+	 * sparse_decode_mem_map 의 역활은 Vitual/Phycal memory 기준의 page frame 을
+	 * 변환해 주는 역활인 것 같다. 
+	 * */
+
 	ms->section_mem_map &= ~SECTION_MAP_MASK;
 	ms->section_mem_map |= sparse_encode_mem_map(mem_map, pnum) |
 							SECTION_HAS_MEM_MAP;

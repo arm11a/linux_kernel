@@ -4617,7 +4617,8 @@ static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
 {
 	unsigned long realtotalpages, totalpages = 0;
 	enum zone_type i;
-
+/*!!C 각 Zone 별 size 의 총 합이 totalpages가 되고 zholes_size[] 의합을 뺀것이
+ * realtotalpages 가 된다. */
 	for (i = 0; i < MAX_NR_ZONES; i++)
 		totalpages += zone_spanned_pages_in_node(pgdat->node_id, i,
 							 node_start_pfn,
@@ -4896,7 +4897,7 @@ void __paginginit free_area_init_node(int nid, unsigned long *zones_size,
 #endif
 	calculate_node_totalpages(pgdat, start_pfn, end_pfn,
 				  zones_size, zholes_size);
-
+/*!!C 2015-05-30 에 여기까지 했음 */
 	alloc_node_mem_map(pgdat);
 #ifdef CONFIG_FLAT_NODE_MEM_MAP
 	printk(KERN_DEBUG "free_area_init_node: node %d, pgdat %08lx, node_mem_map %08lx\n",

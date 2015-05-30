@@ -153,7 +153,7 @@ static void __init find_limits(unsigned long *min, unsigned long *max_low,
 		if (mi->bank[i].highmem)
 				break;
 	/*!!C
-	 * max_low : lowmem 의 가장 높은 address pfn(page frame number, arm_lowmem_limiit)
+	 * max_low : lowmem 의 가장 높은 address pfn(page frame number, arm_lowmem_limit)
 	 * max_high : highmem 의 맥스 pfn
 	 * 우리는 bank 가 2개이다 arm_lowmem_init 에서 low/high를 
 	 * 갈라서 2개로 만들었다.
@@ -257,10 +257,11 @@ void __init setup_dma_zone(const struct machine_desc *mdesc)
 		arm_dma_limit = 0xffffffff;
 #endif
 }
-
+/*!!C min : bank[0] 의 시작주소 max_low : lowmem 의 가장 높은 address pfn, max_high : highmem 의 맥스 pfn */
 static void __init arm_bootmem_free(unsigned long min, unsigned long max_low,
 	unsigned long max_high)
 {
+	/*!!C #define MAX_NR_ZONES 3 */
 	unsigned long zone_size[MAX_NR_ZONES], zhole_size[MAX_NR_ZONES];
 	struct memblock_region *reg;
 
@@ -274,8 +275,11 @@ static void __init arm_bootmem_free(unsigned long min, unsigned long max_low,
 	 * to do anything fancy with the allocation of this memory
 	 * to the zones, now is the time to do it.
 	 */
+	/*!!Q zone_size[0] low mem, zone_size[1(?)] 에 high mem의 size가 들어간다.
+	 * 다음주에 유덕님께 bank와 region 의 개념에 대해서 문의!!*/
 	zone_size[0] = max_low - min;
 #ifdef CONFIG_HIGHMEM
+	/*!!C zone_size[ZONE_HIGHMEM] 는 HIGH MEM 의 size */
 	zone_size[ZONE_HIGHMEM] = max_high - max_low;
 #endif
 

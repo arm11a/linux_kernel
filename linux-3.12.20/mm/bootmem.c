@@ -424,12 +424,16 @@ void __init free_bootmem_node(pg_data_t *pgdat, unsigned long physaddr,
 void __init free_bootmem(unsigned long physaddr, unsigned long size)
 {
 	unsigned long start, end;
-
+	/*!!Q kmemleak 과 memblock 과의 관계에 대해서 명확하게 잘 모르겠음. 
+	 * But.... 추측에 의한 정리로는...
+	 * kmemleak_object 는 memory block allocation 시에 생성한 meta data이다.
+	 */
 	kmemleak_free_part(__va(physaddr), size);
 
 	start = PFN_UP(physaddr);
 	end = PFN_DOWN(physaddr + size);
-
+	// mark_bootmem()은 주어진 영역(start~end) 에 대해서 reserve 이면 bitmap 을 set 하고
+	// reserve가 아니면 bitmap clear 한다. (여기서 bitmap 은 bdata->node_bootmem_map)
 	mark_bootmem(start, end, 0, 0);
 }
 
