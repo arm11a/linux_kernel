@@ -4724,6 +4724,9 @@ static unsigned long __paginginit calc_memmap_size(unsigned long spanned_pages,
 	 * populated regions may not naturally algined on page boundary.
 	 * So the (present_pages >> 4) heuristic is a tradeoff for that.
 	 */
+	/*!!C
+	 * 홀이 대략 어느 정도 있어야지만 page 얼라인하는데 반영한다 ((present_pages >> 4))
+	 */
 	if (spanned_pages > present_pages + (present_pages >> 4) &&
 	    IS_ENABLED(CONFIG_SPARSEMEM))
 		pages = present_pages;
@@ -4774,6 +4777,9 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 		 * is used by this zone for memmap. This affects the watermark
 		 * and per-cpu initialisations
 		 */
+		/*!!C
+		 *  freesize 에서 memmap_pages 를 뺀게 진정한 freesize
+		 */
 		memmap_pages = calc_memmap_size(size, realsize);
 		if (freesize >= memmap_pages) {
 			freesize -= memmap_pages;
@@ -4806,6 +4812,10 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 		 * Set an approximate value for lowmem here, it will be adjusted
 		 * when the bootmem allocator frees pages into the buddy system.
 		 * And all highmem pages will be managed by the buddy system.
+		 */
+		/*!!C
+		 *  highmem 은 buddy 시스템이 관리를 하니깐  memmap 이 필요가 없는듯하다.
+		 *  lowmem 은 memmap 필요.(kernel 이 직접관리)
 		 */
 		zone->managed_pages = is_highmem_idx(j) ? realsize : freesize;
 #ifdef CONFIG_NUMA

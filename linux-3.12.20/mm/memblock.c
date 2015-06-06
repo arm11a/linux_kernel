@@ -20,6 +20,10 @@
 #include <linux/seq_file.h>
 #include <linux/memblock.h>
 
+typedef struct a
+{
+	int b;
+};
 static struct memblock_region memblock_memory_init_regions[INIT_MEMBLOCK_REGIONS] __initdata_memblock;
 static struct memblock_region memblock_reserved_init_regions[INIT_MEMBLOCK_REGIONS] __initdata_memblock;
 
