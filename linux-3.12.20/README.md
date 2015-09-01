@@ -1,13 +1,13 @@
 ## IAMROOT.ORG KERNEL 3.12.20 분석 스터디 `11차 A조` (CORTEX-A7 5420) ##
 
 + [50주차]() `2015.08.29`
-- paging_init()
- - bootmem_init()
-  - sparse_init()
-  - arm_bootmem_free() 복습.
+ - paging_init()
+  - bootmem_init()
+   - sparse_init()
+   - arm_bootmem_free() 복습.
  
 + [49주차]() `2015.08.22`
-- 스터디 복귀 및 전체 내용 복습.
+ - 스터디 복귀 및 전체 내용 복습.
 
 + [48주차]() `2015.06.06`
  - 메르스 및 휴가로 인한 스터디 휴식.
