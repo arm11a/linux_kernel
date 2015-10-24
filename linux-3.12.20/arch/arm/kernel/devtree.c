@@ -80,6 +80,10 @@ void __init arm_dt_memblock_reserve(void)
  *
  * Updates the cpu possible mask with the number of parsed cpu nodes
  */
+/**C
+ * cpu_logical_map 에 hwid 값 세팅
+ * cpu_possible_bits bitmap에 true 세팅
+ */
 void __init arm_dt_init_cpu_maps(void)
 {
 	/*

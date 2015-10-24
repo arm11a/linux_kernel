@@ -370,9 +370,13 @@ static void * unflatten_dt_node(struct boot_param_header *blob,
  * @dt_alloc: An allocator that provides a virtual address to memory
  * for the resulting tree
  */
+/**C
+ * device_node::data 필드의 값을 체우는 부분은 모른다.
+ * of_allnodes 가 root node
+ */
 static void __unflatten_device_tree(struct boot_param_header *blob,
 			     struct device_node **mynodes,
-			     void * (*dt_alloc)(u64 size, u64 align))
+			     void * (*dt_alloc)(u64 siz, u64 align))
 {
 	unsigned long size;
 	void *start, *mem;

@@ -635,6 +635,9 @@ struct mpidr_hash mpidr_hash;
  *			  MPIDR value. Resulting algorithm is a collision
  *			  free hash carried out through shifting and ORing
  */
+/**C
+ * arch/arm/kernel/sleep.S 에서 사용
+ */
 static void __init smp_build_mpidr_hash(void)
 {
 	u32 i, affinity;
@@ -1258,6 +1261,9 @@ void __init setup_arch(char **cmdline_p)
 	reserve_crashkernel();
 
 #ifdef CONFIG_MULTI_IRQ_HANDLER
+	/**C
+	 * 우리는 handle_irq 정의 안됨
+	 */
 	handle_arch_irq = mdesc->handle_irq;
 #endif
 

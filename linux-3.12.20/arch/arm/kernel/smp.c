@@ -72,6 +72,9 @@ static DECLARE_COMPLETION(cpu_running);
 
 static struct smp_operations smp_ops;
 
+/**C
+ * 머신 디스크립터에 정의된 smp operation 포인터를 등록한다.
+ */
 void __init smp_set_ops(struct smp_operations *ops)
 {
 	if (ops)
