@@ -1618,6 +1618,11 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 	size_t size_sum, areas_size, max_distance;
 	int group, i, rc;
 
+	/*!C
+	 * This function determines grouping of units, their mappings to cpus
+	 * and other parameters considering needed percpu size, allocation
+	 * atom size and distances between CPUs.
+	 */
 	ai = pcpu_build_alloc_info(reserved_size, dyn_size, atom_size,
 				   cpu_distance_fn);
 	if (IS_ERR(ai))

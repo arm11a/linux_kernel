@@ -753,6 +753,10 @@ void init_cpu_online(const struct cpumask *src);
  *
  * This does the conversion, and can be used as a constant initializer.
  */
+/*!Q 15/11/21
+ * 하는일은 형변환 밖에 없다 ???
+ * 왜 3항 연산자를 쓴것일까?
+ */
 #define to_cpumask(bitmap)						\
 	((struct cpumask *)(1 ? (bitmap)				\
 			    : (void *)sizeof(__check_is_bitmap(bitmap))))
