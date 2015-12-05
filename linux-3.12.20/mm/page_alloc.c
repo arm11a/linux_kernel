@@ -3248,7 +3248,7 @@ static int build_zonelists_node(pg_data_t *pgdat, struct zonelist *zonelist,
 				int nr_zones)
 {
 	struct zone *zone;
-	enum zone_type zone_type = MAX_NR_ZONES;
+	enum zone_type zone_type = MAX_NR_ZONES; // 3
 
 	do {
 		zone_type--;
@@ -3769,6 +3769,9 @@ static int __build_all_zonelists(void *data)
 	 * needs the percpu allocator in order to allocate its pagesets
 	 * (a chicken-egg dilemma).
 	 */
+	/*!C 각 cpu 에 대한 boot_pageset 구조체타입으로 된 변수의 주소값을 받아와서
+	 * setup_pageset에 인자로 넣는다.
+	 */ 
 	for_each_possible_cpu(cpu) {
 		setup_pageset(&per_cpu(boot_pageset, cpu), 0);
 

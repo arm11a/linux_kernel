@@ -1274,7 +1274,9 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 
 			unit_map[cpu] = unit + i;
 			unit_off[cpu] = gi->base_offset + i * ai->unit_size;
-
+			/*!C
+			 * 가장 낮은 주소 또는 가장 높은 주소를 가지고 있는 cpu unit 이 어떤것인지 찾는 과정
+			 */
 			/* determine low/high unit_cpu */
 			if (pcpu_low_unit_cpu == NR_CPUS ||
 			    unit_off[cpu] < unit_off[pcpu_low_unit_cpu])
