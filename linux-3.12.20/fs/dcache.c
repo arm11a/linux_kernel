@@ -3371,6 +3371,9 @@ static void __init dcache_init_early(void)
 	if (hashdist)
 		return;
 
+	/**!!C
+	 * dentry = directory entry
+	 */
 	dentry_hashtable =
 		alloc_large_system_hash("Dentry cache",
 					sizeof(struct hlist_bl_head),

@@ -643,6 +643,11 @@ void __init mem_init(void)
 	extern u32 itcm_end;
 #endif
 
+	/*!!C
+	 * max_mapnr = 최대 map의 개수를 가지는 변수이다
+	 * mem_map = 시스템에 있는 전체 페이지에 대한 프레임 기술을 가지는 연결 리스트로 생각하면 될 것이다.
+	 * PHYS_PFN_OFFSET = 물리 메모리의 시작하는 위치의 page frame number
+	 */
 	max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
 
 	/* this will put all unused low memory onto the freelists */
@@ -654,6 +659,9 @@ void __init mem_init(void)
 	free_reserved_area(__va(PHYS_OFFSET), swapper_pg_dir, -1, NULL);
 #endif
 
+	/**C
+	 * 15.12.05 여기까지 함
+	 */
 	free_highpages();
 
 	mem_init_print_info(NULL);

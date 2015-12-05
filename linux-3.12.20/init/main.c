@@ -612,7 +612,13 @@ asmlinkage void __init start_kernel(void)
 	 * kmem_cache_init()
 	 */
 	setup_log_buf(0);
+	/*!!C
+	 * pid hash테이블 생성
+	 */
 	pidhash_init();
+	/*!!C
+	 * vfs 시스템을 위한 cache hash 테이블 생성
+	 */
 	vfs_caches_init_early();
 	sort_main_extable();
 	trap_init();

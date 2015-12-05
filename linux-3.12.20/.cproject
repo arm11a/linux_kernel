@@ -29,6 +29,7 @@
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.2112751266" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__KERNEL__=1"/>
+									<listOptionValue builtIn="false" value="__LINUX_ARM_ARCH__=7"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.905355795" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>

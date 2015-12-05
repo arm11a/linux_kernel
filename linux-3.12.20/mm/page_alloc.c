@@ -5475,6 +5475,10 @@ static int page_alloc_cpu_notify(struct notifier_block *self,
 	return NOTIFY_OK;
 }
 
+/**!!C
+ * 	page_alloc_cpu_notify 함수를 cpu_chain list 에 등록하여,
+ * 	suspend ,resume, smp init 등의 이벤트가 발생하면 실행될수 있도록 등록을 한다.
+ */
 void __init page_alloc_init(void)
 {
 	hotcpu_notifier(page_alloc_cpu_notify, 0);
