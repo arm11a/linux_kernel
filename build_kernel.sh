@@ -2,6 +2,7 @@
 NR_CPUS=$(grep "processor"</proc/cpuinfo | wc -l)
 PWD=$(pwd)
 
+ PATH=$PATH:$PWD/gcc-linaro-arm-linux-gnueabihf-4.8-2013.08_linux/bin
 export ARCH=arm
 export CROSS_COMPILE=arm-linux-gnueabihf-
 
